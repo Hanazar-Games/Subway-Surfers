@@ -62,23 +62,25 @@ var cubeRotation = 0;
 main();
 
 function main() {
+  try {
 
-  document.getElementById('music').play();
+    document.getElementById('music').play();
 
-  const canvas = document.querySelector('#glcanvas');
-  const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    const canvas = document.querySelector('#glcanvas');
+    const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
 
-  d = new Date();
-  startTime = d.getTime() * 0.001;
-  policeCaughtUp = startTime;
+    d = new Date();
+    startTime = d.getTime() * 0.001;
+    policeCaughtUp = startTime;
 
-  if (!gl) {
-    alert('Unable to initialize WebGL. Your browser or machine may not support it.');
-    return;
-  }
+    if (!gl) {
+      alert('Unable to initialize WebGL. Your browser or machine may not support it.');
+      gameReady = true;
+      return;
+    }
 
-  // 标记游戏已初始化完成，允许键盘输入
-  gameReady = true;
+    // 标记游戏已初始化完成，允许键盘输入
+    gameReady = true;
 
   const vsSource = `
   attribute vec4 aVertexPosition;
@@ -797,6 +799,10 @@ function main() {
     requestAnimationFrame(render);
   }
   requestAnimationFrame(render);
+  } catch (e) {
+    console.error('Game initialization error:', e);
+    gameReady = true;
+  }
 }
 
 function drawScene(gl, programInfo, deltaTime) {

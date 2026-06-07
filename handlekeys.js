@@ -1,6 +1,9 @@
 // 游戏初始化完成标志，由 main.js 设置
 var gameReady = false;
 
+// 显式声明 key，避免隐式全局变量
+var key;
+
 document.addEventListener(
     "keydown",
     event => {
@@ -9,6 +12,10 @@ document.addEventListener(
             return;
         }
         key = event.keyCode;
+        // 阻止方向键和空格滚动页面
+        if ([32, 37, 38, 39, 40].indexOf(key) !== -1) {
+            event.preventDefault();
+        }
         if (key == 39) {
             player.pos[0] += 6;
             police.pos[0] = player.pos[0];
