@@ -1,6 +1,13 @@
+// 游戏初始化完成标志，由 main.js 设置
+var gameReady = false;
+
 document.addEventListener(
     "keydown",
     event => {
+        // 开场动画期间忽略键盘输入，避免访问未初始化变量
+        if (!gameReady) {
+            return;
+        }
         key = event.keyCode;
         if (key == 39) {
             player.pos[0] += 6;

@@ -77,6 +77,9 @@ function main() {
     return;
   }
 
+  // 标记游戏已初始化完成，允许键盘输入
+  gameReady = true;
+
   const vsSource = `
   attribute vec4 aVertexPosition;
   attribute vec3 aVertexNormal;
