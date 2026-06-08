@@ -241,8 +241,37 @@ var gamePaused = false;
     }
   }
 
+  // ===== Button click sound =====
+  var clickAudio = null;
+  function playClick() {
+    if (!clickAudio) {
+      clickAudio = new Audio();
+      // Simple synthesized click using Web Audio API
+      try {
+        var ctx = new (window.AudioContext || window.webkitAudioContext)();
+        var osc = ctx.createOscillator();
+        var gain = ctx.createGain();
+        osc.connect(gain);
+        gain.connect(ctx.destination);
+        osc.frequency.value = 800;
+        gain.gain.setValueAtTime(0.08, ctx.currentTime);
+        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
+        osc.start(ctx.currentTime);
+        osc.stop(ctx.currentTime + 0.08);
+      } catch (e) {}
+    }
+  }
+
   // ===== Public: Start Game =====
   window.uiStartGame = function () {
+    // Check WebGL support before loading game
+    var canvas = document.getElementById('glcanvas');
+    var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
+    if (!gl) {
+      showScreen('webgl-error');
+      return;
+    }
+
     showScreen('playing');
     hideHUD();
 
@@ -367,6 +396,7 @@ var gamePaused = false;
     var btnHowtoBack = $('#btn-howto-back');
     var btnSettingsBack = $('#btn-settings-back');
     var btnFullscreen = $('#btn-fullscreen');
+    var btnWebglBack = $('#btn-webgl-back');
     var volMusic = $('#volume-music');
     var volSfx = $('#volume-sfx');
     var volMusicVal = $('#volume-music-value');
@@ -375,18 +405,19 @@ var gamePaused = false;
     var toggleFps = $('#toggle-fps');
     fpsEl = $('#fps-counter');
 
-    if (btnStart)  btnStart.onclick = function () { uiStartGame(); };
-    if (btnHowto)  btnHowto.onclick = function () { showScreen('howto'); };
-    if (btnSettings) btnSettings.onclick = function () { showScreen('settings'); };
-    if (btnPause)  btnPause.onclick = function () { uiPauseGame(); };
-    if (btnResume) btnResume.onclick = function () { uiResumeGame(); };
-    if (btnRestartPause) btnRestartPause.onclick = function () { uiRestartGame(); };
-    if (btnMenuPause) btnMenuPause.onclick = function () { uiGoMenu(); };
-    if (btnRestartOver) btnRestartOver.onclick = function () { uiRestartGame(); };
-    if (btnMenuOver) btnMenuOver.onclick = function () { uiGoMenu(); };
-    if (btnHowtoBack) btnHowtoBack.onclick = function () { showScreen('start'); };
-    if (btnSettingsBack) btnSettingsBack.onclick = function () { showScreen('start'); };
-    if (btnFullscreen) btnFullscreen.onclick = function () { uiToggleFullscreen(); };
+    if (btnStart)  btnStart.onclick = function () { playClick(); uiStartGame(); };
+    if (btnHowto)  btnHowto.onclick = function () { playClick(); showScreen('howto'); };
+    if (btnSettings) btnSettings.onclick = function () { playClick(); showScreen('settings'); };
+    if (btnPause)  btnPause.onclick = function () { playClick(); uiPauseGame(); };
+    if (btnResume) btnResume.onclick = function () { playClick(); uiResumeGame(); };
+    if (btnRestartPause) btnRestartPause.onclick = function () { playClick(); uiRestartGame(); };
+    if (btnMenuPause) btnMenuPause.onclick = function () { playClick(); uiGoMenu(); };
+    if (btnRestartOver) btnRestartOver.onclick = function () { playClick(); uiRestartGame(); };
+    if (btnMenuOver) btnMenuOver.onclick = function () { playClick(); uiGoMenu(); };
+    if (btnHowtoBack) btnHowtoBack.onclick = function () { playClick(); showScreen('start'); };
+    if (btnSettingsBack) btnSettingsBack.onclick = function () { playClick(); showScreen('start'); };
+    if (btnFullscreen) btnFullscreen.onclick = function () { playClick(); uiToggleFullscreen(); };
+    if (btnWebglBack) btnWebglBack.onclick = function () { playClick(); showScreen('start'); };
 
     // Audio sliders
     var s = getAudioSettings();
