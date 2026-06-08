@@ -230,6 +230,20 @@ var gamePaused = false;
     }, 1500);
   }
 
+  // ===== Dynamic Theme Colors =====
+  function setThemeColors(isNeon) {
+    var root = document.documentElement;
+    if (isNeon) {
+      root.style.setProperty('--neon-pink', '#b829dd');
+      root.style.setProperty('--shadow-pink', '0 0 25px rgba(184,41,221,0.35)');
+      root.style.setProperty('--border-glow', 'rgba(184,41,221,0.25)');
+    } else {
+      root.style.setProperty('--neon-pink', '#ff2a6d');
+      root.style.setProperty('--shadow-pink', '0 0 25px rgba(255,42,109,0.35)');
+      root.style.setProperty('--border-glow', 'rgba(255,42,109,0.25)');
+    }
+  }
+
   // ===== Score Pop Animation =====
   function popScore(el) {
     if (!el) return;
@@ -281,6 +295,7 @@ var gamePaused = false;
       if (typeof theme !== 'undefined' && theme !== lastTheme) {
         lastTheme = theme;
         flashTheme(theme === 1 ? 'City Theme' : 'Neon Theme');
+        setThemeColors(theme === 2);
       }
       // Power-ups
       if (typeof player !== 'undefined') {

@@ -80,6 +80,16 @@ html, body {
 .ui-overlay.hidden {
   opacity: 0; visibility: hidden; pointer-events: none;
 }
+#pause-overlay {
+  background: rgba(7, 7, 12, 0.75);
+  backdrop-filter: blur(20px) saturate(1.3);
+  -webkit-backdrop-filter: blur(20px) saturate(1.3);
+}
+#gameover-overlay {
+  background: rgba(7, 7, 12, 0.88);
+  backdrop-filter: blur(16px) saturate(1.1);
+  -webkit-backdrop-filter: blur(16px) saturate(1.1);
+}
 
 /* ===== Glass Card ===== */
 .glass-card {
