@@ -64,10 +64,43 @@
         <button id="btn-howto" class="btn btn-outline">
           <span>?</span> How to Play
         </button>
+        <button id="btn-stats" class="btn btn-outline">
+          <span>📊</span> Stats
+        </button>
         <button id="btn-settings" class="btn btn-outline">
           <span>⚙</span> Settings
         </button>
       </div>
+    </div>
+  </div>
+
+  <!-- ===== Stats ===== -->
+  <div id="stats-screen" class="ui-screen hidden">
+    <div class="glass-card" style="min-width: 420px; max-width: 480px;">
+      <div class="game-logo-small">Statistics</div>
+      <div class="stats-grid">
+        <div class="stat-box">
+          <div class="stat-box-value" id="stat-games">0</div>
+          <div class="stat-box-label">Games Played</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-box-value" id="stat-wins">0</div>
+          <div class="stat-box-label">Wins</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-box-value hud-value-gold" id="stat-total-coins">0</div>
+          <div class="stat-box-label">Total Coins</div>
+        </div>
+        <div class="stat-box">
+          <div class="stat-box-value" id="stat-best">0</div>
+          <div class="stat-box-label">Best Score</div>
+        </div>
+      </div>
+      <div style="margin-top:20px; text-align:left;">
+        <div style="font-size:11px; font-weight:600; letter-spacing:2px; text-transform:uppercase; color:var(--text-muted); margin-bottom:10px;">Achievements</div>
+        <div id="achievements-list" class="achievements-list"></div>
+      </div>
+      <button id="btn-stats-back" class="btn btn-outline btn-sm" style="margin-top:20px;">← Back</button>
     </div>
   </div>
 

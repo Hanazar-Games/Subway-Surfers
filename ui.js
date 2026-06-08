@@ -118,6 +118,88 @@ var gamePaused = false;
     }
   };
 
+  // ===== Stats & Achievements =====
+  var ACHIEVEMENTS = [
+    { id: 'first_game',   icon: '🎮', name: 'First Steps',      desc: 'Play your first game',           check: function (s) { return s.games >= 1; } },
+    { id: 'score_500',    icon: '🥈', name: 'Runner',           desc: 'Score 500+ points',              check: function (s) { return s.best >= 500; } },
+    { id: 'score_1000',   icon: '💎', name: 'Legend',           desc: 'Score 1000+ points',             check: function (s) { return s.best >= 1000; } },
+    { id: 'coins_50',     icon: '🪙', name: 'Coin Collector',   desc: 'Collect 50+ coins in one game',  check: function (s) { return s.maxCoins >= 50; } },
+    { id: 'coins_100',    icon: '🏆', name: 'Coin Master',      desc: 'Collect 100+ coins in one game', check: function (s) { return s.maxCoins >= 100; } },
+    { id: 'win_1',        icon: '🏁', name: 'Survivor',         desc: 'Win a game',                     check: function (s) { return s.wins >= 1; } },
+    { id: 'win_5',        icon: '👑', name: 'Champion',         desc: 'Win 5 games',                    check: function (s) { return s.wins >= 5; } },
+  ];
+
+  function getStats() {
+    var raw = localStorage.getItem('ss_stats');
+    if (!raw) return { games: 0, wins: 0, totalCoins: 0, best: 0, maxCoins: 0 };
+    try { return JSON.parse(raw); } catch (e) { return { games: 0, wins: 0, totalCoins: 0, best: 0, maxCoins: 0 }; }
+  }
+  function saveStats(obj) {
+    localStorage.setItem('ss_stats', JSON.stringify(obj));
+  }
+  function getUnlockedAchievements() {
+    var raw = localStorage.getItem('ss_achievements');
+    if (!raw) return [];
+    try { return JSON.parse(raw); } catch (e) { return []; }
+  }
+  function unlockAchievement(id) {
+    var list = getUnlockedAchievements();
+    if (list.indexOf(id) === -1) {
+      list.push(id);
+      localStorage.setItem('ss_achievements', JSON.stringify(list));
+      return true;
+    }
+    return false;
+  }
+  function updateStats(won, finalScore, finalCoins) {
+    var s = getStats();
+    s.games += 1;
+    if (won) s.wins += 1;
+    s.totalCoins += finalCoins;
+    if (finalScore > s.best) s.best = Math.floor(finalScore);
+    if (finalCoins > s.maxCoins) s.maxCoins = finalCoins;
+    saveStats(s);
+    // Check achievements
+    var newlyUnlocked = [];
+    ACHIEVEMENTS.forEach(function (a) {
+      if (a.check(s) && unlockAchievement(a.id)) {
+        newlyUnlocked.push(a);
+      }
+    });
+    return newlyUnlocked;
+  }
+  function renderAchievements() {
+    var container = $('#achievements-list');
+    if (!container) return;
+    var unlocked = getUnlockedAchievements();
+    container.innerHTML = '';
+    ACHIEVEMENTS.forEach(function (a) {
+      var isUnlocked = unlocked.indexOf(a.id) !== -1;
+      var div = document.createElement('div');
+      div.className = 'achievement-item' + (isUnlocked ? ' unlocked' : '');
+      div.innerHTML =
+        '<div class="achievement-icon">' + a.icon + '</div>' +
+        '<div class="achievement-info">' +
+          '<div class="achievement-name">' + a.name + '</div>' +
+          '<div class="achievement-desc">' + a.desc + '</div>' +
+        '</div>' +
+        '<div style="font-size:16px;">' + (isUnlocked ? '✅' : '🔒') + '</div>';
+      container.appendChild(div);
+    });
+  }
+  function renderStats() {
+    var s = getStats();
+    var elGames = $('#stat-games');
+    var elWins = $('#stat-wins');
+    var elCoins = $('#stat-total-coins');
+    var elBest = $('#stat-best');
+    if (elGames) elGames.textContent = s.games;
+    if (elWins) elWins.textContent = s.wins;
+    if (elCoins) elCoins.textContent = formatNum(s.totalCoins);
+    if (elBest) elBest.textContent = formatNum(s.best);
+    renderAchievements();
+  }
+
   // ===== High Score =====
   function getHighScore() {
     var v = localStorage.getItem('ss_highscore');
@@ -365,9 +447,32 @@ var gamePaused = false;
     if (coinV) coinV.textContent = finalCoins;
 
     var isNewBest = setHighScore(finalScore);
+    var newAchievements = updateStats(won, finalScore, finalCoins);
     if (bestWrap) bestWrap.style.display = '';
     if (bestV) {
       bestV.textContent = formatNum(getHighScore()) + (isNewBest ? ' ★' : '');
+    }
+    // Show achievement unlock toast
+    newAchievements.forEach(function (a, i) {
+      setTimeout(function () {
+        showAchievementToast(a);
+      }, i * 800 + 500);
+    });
+
+    // Achievement unlock toast helper
+    function showAchievementToast(a) {
+      var toast = document.createElement('div');
+      toast.style.cssText =
+        'position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:500;' +
+        'background:rgba(15,15,24,0.95); border:1px solid rgba(255,215,0,0.3);' +
+        'border-radius:12px; padding:12px 24px; display:flex; align-items:center; gap:12px;' +
+        'font-size:14px; color:#fff; box-shadow:0 0 30px rgba(255,215,0,0.2);' +
+        'animation:toast-in 0.4s ease, toast-out 0.4s ease 2.6s forwards;';
+      toast.innerHTML = '<span style="font-size:20px;">' + a.icon + '</span> <b>' + a.name + '</b> unlocked!';
+      document.body.appendChild(toast);
+      setTimeout(function () {
+        if (toast.parentNode) toast.parentNode.removeChild(toast);
+      }, 3000);
     }
 
     // New record celebration
@@ -401,6 +506,8 @@ var gamePaused = false;
     var btnRestartOver = $('#btn-restart-over');
     var btnMenuOver = $('#btn-menu-over');
     var btnHowtoBack = $('#btn-howto-back');
+    var btnStats = $('#btn-stats');
+    var btnStatsBack = $('#btn-stats-back');
     var btnSettingsBack = $('#btn-settings-back');
     var btnFullscreen = $('#btn-fullscreen');
     var btnWebglBack = $('#btn-webgl-back');
@@ -422,6 +529,8 @@ var gamePaused = false;
     if (btnRestartOver) btnRestartOver.onclick = function () { playClick(); uiRestartGame(); };
     if (btnMenuOver) btnMenuOver.onclick = function () { playClick(); uiGoMenu(); };
     if (btnHowtoBack) btnHowtoBack.onclick = function () { playClick(); showScreen('start'); };
+    if (btnStats) btnStats.onclick = function () { playClick(); renderStats(); showScreen('stats'); };
+    if (btnStatsBack) btnStatsBack.onclick = function () { playClick(); showScreen('start'); };
     if (btnSettingsBack) btnSettingsBack.onclick = function () { playClick(); showScreen('start'); };
     if (btnFullscreen) btnFullscreen.onclick = function () { playClick(); uiToggleFullscreen(); };
     if (btnWebglBack) btnWebglBack.onclick = function () { playClick(); showScreen('start'); };
