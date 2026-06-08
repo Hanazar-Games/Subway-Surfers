@@ -27,6 +27,7 @@ var gamePaused = false;
     settings: $('#settings-screen'),
     pause:    $('#pause-overlay'),
     gameover: $('#gameover-overlay'),
+    'webgl-error': $('#webgl-error'),
     hud:      $('#hud'),
   };
 
