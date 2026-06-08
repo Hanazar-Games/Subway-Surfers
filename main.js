@@ -397,6 +397,10 @@ function main() {
   var then = 0;
 
   function render(now) {
+    if (gamePaused) {
+      requestAnimationFrame(render);
+      return;
+    }
     now *= 0.001;  // convert to seconds
     const deltaTime = now - then;
     then = now;
@@ -558,7 +562,7 @@ function main() {
             if (player.pos[2] >= trainF[i].pos[2] - 18 && player.pos[2] <= trainF[i].pos[2]) {
               score = -player.pos[2] + coins_collected;
               Die();
-              alert("YOU LOST\nScore: " + score + "\nCoins: " + coins_collected);
+              if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
           }
         }
@@ -572,7 +576,7 @@ function main() {
             if (player.pos[2] <= boxes[i].pos[2] + 3 && player.pos[2] >= boxes[i].pos[2] - 3) {
               score = -player.pos[2] + coins_collected;
               Die();
-              alert("YOU LOST\nScore: " + score + "\nCoins: " + coins_collected);
+              if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
           }
         }
@@ -586,7 +590,7 @@ function main() {
             if (player.pos[2] <= manholes[i].pos[2] + 2.3 && player.pos[2] >= manholes[i].pos[2] - 2.3) {
               score = -player.pos[2] + coins_collected;
               Die();
-              alert("YOU LOST\nScore: " + score + "\nCoins: " + coins_collected);
+              if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
           }
         }
@@ -601,7 +605,7 @@ function main() {
               if (duck_obs_stop[i].pos[2] >= player.pos[2] - 0.7 && duck_obs_stop[i].pos[2] <= player.pos[2] + 0.7) {
                 d = new Date();
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
-                  alert("YOU LOST\nScore: " + score + "\nCoins: " + coins_collected);
+                  if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
                 }
                 else {
                   obstacle_hit = i;
@@ -625,7 +629,7 @@ function main() {
                 d = new Date();
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
                   score = -player.pos[2] + coins_collected;
-                  alert("YOU LOST\nScore: " + score + "\nCoins: " + coins_collected);
+                  if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
                 }
                 else {
                   obstacle_hit = i;
@@ -648,7 +652,7 @@ function main() {
               d = new Date();
               if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
                 score = -player.pos[2] + coins_collected;
-                alert("YOU LOST\nScore: " + score + "\nCoins: " + coins_collected);
+                if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
               }
               else {
                 obstacle_hit = i;
@@ -778,7 +782,7 @@ function main() {
 
     if (player.pos[2] <= -800) {
       score = -player.pos[2] + coins_collected;
-      alert("YOU WON\nScore: " + score + "\nCoins: " + coins_collected);
+      if (typeof uiGameOver === 'function') { uiGameOver(true, score, coins_collected); return; }
     }
 
     if (greyScale) {
