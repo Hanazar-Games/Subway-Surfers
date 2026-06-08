@@ -99,6 +99,20 @@ var gamePaused = false;
     if (crashAudio) crashAudio.volume = s.sfx;
   }
 
+  // ===== Number formatting =====
+  function formatNum(n) {
+    return n.toString().replace(/\B(?=(\d{3})+(?!\d))/g, ',');
+  }
+
+  // ===== Fullscreen =====
+  window.uiToggleFullscreen = function () {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(function () {});
+    } else {
+      document.exitFullscreen().catch(function () {});
+    }
+  };
+
   // ===== High Score =====
   function getHighScore() {
     var v = localStorage.getItem('ss_highscore');
@@ -150,14 +164,21 @@ var gamePaused = false;
     var pBoots = $('#power-boots');
     var pFly = $('#power-fly');
     var pHover = $('#power-hover');
+    var wBoots = $('#wrap-boots');
+    var wFly = $('#wrap-fly');
+    var wHover = $('#wrap-hover');
+    var fBoots = $('#fill-boots');
+    var fFly = $('#fill-fly');
+    var fHover = $('#fill-hover');
     updateHighScoreDisplay();
 
     hudInterval = setInterval(function () {
+      var now = Date.now() * 0.001;
       // Score
       if (typeof score !== 'undefined' && score !== lastScore) {
         lastScore = score;
         if (scoreEl) {
-          scoreEl.textContent = Math.floor(score);
+          scoreEl.textContent = formatNum(Math.floor(score));
           popScore(scoreEl);
         }
       }
@@ -165,7 +186,7 @@ var gamePaused = false;
       if (typeof coins_collected !== 'undefined' && coins_collected !== lastCoins) {
         lastCoins = coins_collected;
         if (coinEl) {
-          coinEl.textContent = coins_collected;
+          coinEl.textContent = formatNum(coins_collected);
           popScore(coinEl);
         }
       }
@@ -176,9 +197,28 @@ var gamePaused = false;
       }
       // Power-ups
       if (typeof player !== 'undefined') {
-        if (pBoots)  pBoots.classList.toggle('active', !!player.jumping_boots);
-        if (pFly)    pFly.classList.toggle('active', !!player.fly_boost);
-        if (pHover)  pHover.classList.toggle('active', !!player.hoverboard);
+        var bActive = !!player.jumping_boots;
+        var fActive = !!player.fly_boost;
+        var hActive = !!player.hoverboard;
+        if (pBoots)  pBoots.classList.toggle('active', bActive);
+        if (pFly)    pFly.classList.toggle('active', fActive);
+        if (pHover)  pHover.classList.toggle('active', hActive);
+        if (wBoots)  wBoots.classList.toggle('active', bActive);
+        if (wFly)    wFly.classList.toggle('active', fActive);
+        if (wHover)  wHover.classList.toggle('active', hActive);
+        // Power-up countdown bars (10 second duration)
+        if (fBoots && typeof boots_acquired !== 'undefined' && bActive) {
+          var rem = Math.max(0, 10 - (now - boots_acquired));
+          fBoots.style.transform = 'scaleX(' + (rem / 10) + ')';
+        } else if (fBoots) { fBoots.style.transform = 'scaleX(0)'; }
+        if (fFly && typeof fb_acquired !== 'undefined' && fActive) {
+          var rem = Math.max(0, 10 - (now - fb_acquired));
+          fFly.style.transform = 'scaleX(' + (rem / 10) + ')';
+        } else if (fFly) { fFly.style.transform = 'scaleX(0)'; }
+        if (fHover && typeof hoverboard_acquired !== 'undefined' && hActive) {
+          var rem = Math.max(0, 10 - (now - hoverboard_acquired));
+          fHover.style.transform = 'scaleX(' + (rem / 10) + ')';
+        } else if (fHover) { fHover.style.transform = 'scaleX(0)'; }
       }
     }, 80);
   }
@@ -252,7 +292,7 @@ var gamePaused = false;
       title.textContent = won ? 'YOU WON!' : 'GAME OVER';
       title.className = 'result-title ' + (won ? 'win' : 'lose');
     }
-    if (scoreV) scoreV.textContent = Math.floor(finalScore);
+    if (scoreV) scoreV.textContent = formatNum(Math.floor(finalScore));
     if (coinV) coinV.textContent = finalCoins;
 
     var isNewBest = setHighScore(finalScore);
@@ -277,6 +317,7 @@ var gamePaused = false;
     var btnMenuOver = $('#btn-menu-over');
     var btnHowtoBack = $('#btn-howto-back');
     var btnSettingsBack = $('#btn-settings-back');
+    var btnFullscreen = $('#btn-fullscreen');
     var volMusic = $('#volume-music');
     var volSfx = $('#volume-sfx');
     var volMusicVal = $('#volume-music-value');
@@ -294,6 +335,7 @@ var gamePaused = false;
     if (btnMenuOver) btnMenuOver.onclick = function () { uiGoMenu(); };
     if (btnHowtoBack) btnHowtoBack.onclick = function () { showScreen('start'); };
     if (btnSettingsBack) btnSettingsBack.onclick = function () { showScreen('start'); };
+    if (btnFullscreen) btnFullscreen.onclick = function () { uiToggleFullscreen(); };
 
     // Audio sliders
     var s = getAudioSettings();

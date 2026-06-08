@@ -297,6 +297,30 @@ html, body {
   background: rgba(0,255,136,0.08);
   --shadow-color: rgba(0,255,136,0.2);
 }
+.power-wrap {
+  display: flex; flex-direction: column; align-items: center; gap: 4px;
+}
+.power-bar {
+  width: 28px; height: 3px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  overflow: hidden;
+  opacity: 0;
+  transition: opacity 0.3s;
+}
+.power-wrap.active .power-bar {
+  opacity: 1;
+}
+.power-fill {
+  width: 100%; height: 100%;
+  background: var(--fill-color, #fff);
+  border-radius: 2px;
+  transform-origin: left;
+  transition: transform 0.1s linear;
+}
+#fill-boots { --fill-color: #ffaa00; }
+#fill-fly    { --fill-color: #05d9e8; }
+#fill-hover  { --fill-color: #00ff88; }
 
 /* ===== Game Over / Win Screen ===== */
 .result-title {

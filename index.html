@@ -147,9 +147,18 @@
       <div class="hud-right">
         <button id="hud-pause" class="hud-pause-btn">⏸</button>
         <div class="hud-powers">
-          <div class="power-icon" id="power-boots" data-type="boots" title="Jumping Boots">🥾</div>
-          <div class="power-icon" id="power-fly" data-type="fly" title="Flying Boost">🚀</div>
-          <div class="power-icon" id="power-hover" data-type="hover" title="Hoverboard">🛹</div>
+          <div class="power-wrap" id="wrap-boots">
+            <div class="power-icon" id="power-boots" data-type="boots" title="Jumping Boots">🥾</div>
+            <div class="power-bar"><div class="power-fill" id="fill-boots"></div></div>
+          </div>
+          <div class="power-wrap" id="wrap-fly">
+            <div class="power-icon" id="power-fly" data-type="fly" title="Flying Boost">🚀</div>
+            <div class="power-bar"><div class="power-fill" id="fill-fly"></div></div>
+          </div>
+          <div class="power-wrap" id="wrap-hover">
+            <div class="power-icon" id="power-hover" data-type="hover" title="Hoverboard">🛹</div>
+            <div class="power-bar"><div class="power-fill" id="fill-hover"></div></div>
+          </div>
         </div>
       </div>
     </div>
