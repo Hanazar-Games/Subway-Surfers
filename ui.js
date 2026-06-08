@@ -1,6 +1,6 @@
 /**
  * Subway Surfers - Modern UI Controller
- * Manages: Start Menu, HUD, Pause, Game Over, Settings
+ * Manages: Start Menu, HUD, Pause, Game Over, Settings, High Scores
  * Minimal intrusion into game core (main.js)
  */
 
@@ -16,6 +16,8 @@ var gamePaused = false;
   var crashAudio = null;
   var hudInterval = null;
   var countdownTimer = null;
+  var themeFlashTimer = null;
+  var scorePopTimer = null;
 
   // ===== DOM refs =====
   var $ = function (sel) { return document.querySelector(sel); };
@@ -41,12 +43,16 @@ var gamePaused = false;
 
   function showHUD() {
     screens.hud.classList.add('visible');
+    var hs = $('#hud-highscore');
+    if (hs) hs.classList.add('visible');
   }
   function hideHUD() {
     screens.hud.classList.remove('visible');
+    var hs = $('#hud-highscore');
+    if (hs) hs.classList.remove('visible');
   }
 
-  // ===== Countdown before game start =====
+  // ===== Countdown =====
   function runCountdown(cb) {
     var overlay = $('#countdown-overlay');
     var numEl = $('#countdown-number');
@@ -58,7 +64,6 @@ var gamePaused = false;
       count--;
       if (count > 0) {
         numEl.textContent = count;
-        // re-trigger animation
         numEl.style.animation = 'none';
         void numEl.offsetWidth;
         numEl.style.animation = '';
@@ -77,37 +82,97 @@ var gamePaused = false;
     countdownTimer = setInterval(tick, 800);
   }
 
-  // ===== Audio helpers =====
-  function setVolume(vol) {
+  // ===== Audio System =====
+  function getAudioSettings() {
+    var raw = localStorage.getItem('ss_audio');
+    if (!raw) return { music: 0.5, sfx: 0.5 };
+    try { return JSON.parse(raw); } catch (e) { return { music: 0.5, sfx: 0.5 }; }
+  }
+  function saveAudioSettings(obj) {
+    localStorage.setItem('ss_audio', JSON.stringify(obj));
+  }
+  function applyAudio() {
+    var s = getAudioSettings();
     gameAudio = document.getElementById('music');
     crashAudio = document.getElementById('crash');
-    if (gameAudio) gameAudio.volume = vol;
-    if (crashAudio) crashAudio.volume = vol;
-    localStorage.setItem('ss_volume', String(vol));
-  }
-  function getVolume() {
-    var v = localStorage.getItem('ss_volume');
-    return v === null ? 0.5 : parseFloat(v);
+    if (gameAudio) gameAudio.volume = s.music;
+    if (crashAudio) crashAudio.volume = s.sfx;
   }
 
-  // ===== HUD updater (polls game state) =====
+  // ===== High Score =====
+  function getHighScore() {
+    var v = localStorage.getItem('ss_highscore');
+    return v === null ? 0 : parseInt(v, 10);
+  }
+  function setHighScore(val) {
+    var cur = getHighScore();
+    if (val > cur) {
+      localStorage.setItem('ss_highscore', String(Math.floor(val)));
+      return true;
+    }
+    return false;
+  }
+  function updateHighScoreDisplay() {
+    var el = $('#hud-highscore-val');
+    if (el) el.textContent = getHighScore();
+  }
+
+  // ===== Theme Indicator =====
+  function flashTheme(name) {
+    var el = $('#hud-theme');
+    if (!el) return;
+    el.textContent = name;
+    el.className = 'visible ' + (name.indexOf('City') !== -1 ? 'city' : 'neon');
+    if (themeFlashTimer) clearTimeout(themeFlashTimer);
+    themeFlashTimer = setTimeout(function () {
+      el.classList.remove('visible');
+    }, 1500);
+  }
+
+  // ===== Score Pop Animation =====
+  function popScore(el) {
+    if (!el) return;
+    el.classList.remove('score-pop');
+    void el.offsetWidth;
+    el.classList.add('score-pop');
+    if (scorePopTimer) clearTimeout(scorePopTimer);
+    scorePopTimer = setTimeout(function () {
+      el.classList.remove('score-pop');
+    }, 400);
+  }
+
+  // ===== HUD updater =====
   function startHUDUpdate() {
     stopHUDUpdate();
-    var lastScore = -1, lastCoins = -1;
+    var lastScore = -1, lastCoins = -1, lastTheme = -1;
     var scoreEl = $('#hud-score');
     var coinEl = $('#hud-coins');
     var pBoots = $('#power-boots');
     var pFly = $('#power-fly');
     var pHover = $('#power-hover');
+    updateHighScoreDisplay();
 
     hudInterval = setInterval(function () {
+      // Score
       if (typeof score !== 'undefined' && score !== lastScore) {
         lastScore = score;
-        if (scoreEl) scoreEl.textContent = Math.floor(score);
+        if (scoreEl) {
+          scoreEl.textContent = Math.floor(score);
+          popScore(scoreEl);
+        }
       }
+      // Coins
       if (typeof coins_collected !== 'undefined' && coins_collected !== lastCoins) {
         lastCoins = coins_collected;
-        if (coinEl) coinEl.textContent = coins_collected;
+        if (coinEl) {
+          coinEl.textContent = coins_collected;
+          popScore(coinEl);
+        }
+      }
+      // Theme
+      if (typeof theme !== 'undefined' && theme !== lastTheme) {
+        lastTheme = theme;
+        flashTheme(theme === 1 ? 'City Theme' : 'Neon Theme');
       }
       // Power-ups
       if (typeof player !== 'undefined') {
@@ -115,7 +180,7 @@ var gamePaused = false;
         if (pFly)    pFly.classList.toggle('active', !!player.fly_boost);
         if (pHover)  pHover.classList.toggle('active', !!player.hoverboard);
       }
-    }, 100);
+    }, 80);
   }
   function stopHUDUpdate() {
     if (hudInterval) { clearInterval(hudInterval); hudInterval = null; }
@@ -126,7 +191,6 @@ var gamePaused = false;
     showScreen('playing');
     hideHUD();
 
-    // If main.js not loaded yet, load it first
     if (typeof main !== 'function') {
       var s = document.createElement('script');
       s.src = './main.js';
@@ -138,8 +202,6 @@ var gamePaused = false;
       };
       document.body.appendChild(s);
     } else {
-      // Game already initialized once: reload page to reset state
-      // (simpler than trying to reset 1000+ game objects)
       location.reload();
     }
   };
@@ -157,7 +219,6 @@ var gamePaused = false;
     showScreen('playing');
     showHUD();
     if (gameAudio) gameAudio.play().catch(function () {});
-    // Small delay then unpause so user has time to prepare
     setTimeout(function () {
       gamePaused = false;
     }, 100);
@@ -165,10 +226,17 @@ var gamePaused = false;
 
   // ===== Public: Restart =====
   window.uiRestartGame = function () {
+    sessionStorage.setItem('ss_skipSplash', 'true');
     location.reload();
   };
 
-  // ===== Public: Game Over callback (injected into main.js) =====
+  // ===== Public: Go to Menu =====
+  window.uiGoMenu = function () {
+    sessionStorage.setItem('ss_skipSplash', 'true');
+    location.reload();
+  };
+
+  // ===== Public: Game Over =====
   window.uiGameOver = function (won, finalScore, finalCoins) {
     gamePaused = true;
     stopHUDUpdate();
@@ -177,6 +245,8 @@ var gamePaused = false;
     var title = $('#result-title');
     var scoreV = $('#result-score');
     var coinV = $('#result-coins');
+    var bestWrap = $('#result-best-wrap');
+    var bestV = $('#result-best');
 
     if (title) {
       title.textContent = won ? 'YOU WON!' : 'GAME OVER';
@@ -185,12 +255,17 @@ var gamePaused = false;
     if (scoreV) scoreV.textContent = Math.floor(finalScore);
     if (coinV) coinV.textContent = finalCoins;
 
+    var isNewBest = setHighScore(finalScore);
+    if (bestWrap) bestWrap.style.display = '';
+    if (bestV) {
+      bestV.textContent = getHighScore() + (isNewBest ? ' ★' : '');
+    }
+
     showScreen('gameover');
   };
 
   // ===== Event bindings =====
   document.addEventListener('DOMContentLoaded', function () {
-    // Start screen buttons
     var btnStart = $('#btn-start');
     var btnHowto = $('#btn-howto');
     var btnSettings = $('#btn-settings');
@@ -202,7 +277,11 @@ var gamePaused = false;
     var btnMenuOver = $('#btn-menu-over');
     var btnHowtoBack = $('#btn-howto-back');
     var btnSettingsBack = $('#btn-settings-back');
-    var volSlider = $('#volume-slider');
+    var volMusic = $('#volume-music');
+    var volSfx = $('#volume-sfx');
+    var volMusicVal = $('#volume-music-value');
+    var volSfxVal = $('#volume-sfx-value');
+    var toggleSplash = $('#toggle-splash');
 
     if (btnStart)  btnStart.onclick = function () { uiStartGame(); };
     if (btnHowto)  btnHowto.onclick = function () { showScreen('howto'); };
@@ -210,20 +289,40 @@ var gamePaused = false;
     if (btnPause)  btnPause.onclick = function () { uiPauseGame(); };
     if (btnResume) btnResume.onclick = function () { uiResumeGame(); };
     if (btnRestartPause) btnRestartPause.onclick = function () { uiRestartGame(); };
-    if (btnMenuPause) btnMenuPause.onclick = function () { location.reload(); };
+    if (btnMenuPause) btnMenuPause.onclick = function () { uiGoMenu(); };
     if (btnRestartOver) btnRestartOver.onclick = function () { uiRestartGame(); };
-    if (btnMenuOver) btnMenuOver.onclick = function () { location.reload(); };
+    if (btnMenuOver) btnMenuOver.onclick = function () { uiGoMenu(); };
     if (btnHowtoBack) btnHowtoBack.onclick = function () { showScreen('start'); };
     if (btnSettingsBack) btnSettingsBack.onclick = function () { showScreen('start'); };
 
-    // Volume
-    var volValue = $('#volume-value');
-    if (volSlider) {
-      volSlider.value = getVolume() * 100;
-      if (volValue) volValue.textContent = Math.round(volSlider.value) + '%';
-      volSlider.oninput = function () {
-        setVolume(volSlider.value / 100);
-        if (volValue) volValue.textContent = Math.round(volSlider.value) + '%';
+    // Audio sliders
+    var s = getAudioSettings();
+    if (volMusic) {
+      volMusic.value = s.music * 100;
+      if (volMusicVal) volMusicVal.textContent = Math.round(volMusic.value) + '%';
+      volMusic.oninput = function () {
+        s.music = volMusic.value / 100;
+        saveAudioSettings(s);
+        applyAudio();
+        if (volMusicVal) volMusicVal.textContent = Math.round(volMusic.value) + '%';
+      };
+    }
+    if (volSfx) {
+      volSfx.value = s.sfx * 100;
+      if (volSfxVal) volSfxVal.textContent = Math.round(volSfx.value) + '%';
+      volSfx.oninput = function () {
+        s.sfx = volSfx.value / 100;
+        saveAudioSettings(s);
+        applyAudio();
+        if (volSfxVal) volSfxVal.textContent = Math.round(volSfx.value) + '%';
+      };
+    }
+
+    // Splash toggle
+    if (toggleSplash) {
+      toggleSplash.checked = sessionStorage.getItem('ss_skipSplash') !== 'true';
+      toggleSplash.onchange = function () {
+        sessionStorage.setItem('ss_skipSplash', toggleSplash.checked ? '' : 'true');
       };
     }
 
@@ -235,8 +334,8 @@ var gamePaused = false;
       }
     });
 
-    // Init volume
-    setVolume(getVolume());
+    applyAudio();
+    updateHighScoreDisplay();
   });
 
 })();
