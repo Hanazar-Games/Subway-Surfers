@@ -659,6 +659,38 @@ html, body {
   .touch-controls { display: none !important; }
 }
 
+/* ===== Key Hint Overlay ===== */
+.key-hint {
+  position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
+  z-index: 152;
+  display: flex; gap: 20px;
+  background: rgba(0,0,0,0.5);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(255,255,255,0.08);
+  border-radius: var(--radius-md);
+  padding: 12px 24px;
+  opacity: 0;
+  transition: opacity 0.5s;
+  pointer-events: none;
+}
+.key-hint.visible {
+  opacity: 1;
+}
+.key-hint-row {
+  display: flex; align-items: center; gap: 8px;
+  font-size: 13px; color: var(--text-secondary);
+}
+.key-hint-key {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 26px; height: 26px;
+  background: rgba(255,255,255,0.08);
+  border: 1px solid rgba(255,255,255,0.12);
+  border-radius: 5px;
+  font-size: 12px; font-weight: 700;
+  color: #fff;
+  font-family: monospace;
+}
+
 /* ===== Responsive canvas sizing ===== */
 @media (max-width: 1320px) {
   #game-stage canvas {

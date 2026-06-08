@@ -230,6 +230,17 @@ var gamePaused = false;
     if (hudInterval) { clearInterval(hudInterval); hudInterval = null; }
   }
 
+  // ===== Key Hint =====
+  function showKeyHint() {
+    var hint = $('#key-hint');
+    if (hint) {
+      hint.classList.add('visible');
+      setTimeout(function () {
+        if (hint) hint.classList.remove('visible');
+      }, 3500);
+    }
+  }
+
   // ===== Public: Start Game =====
   window.uiStartGame = function () {
     showScreen('playing');
@@ -242,6 +253,7 @@ var gamePaused = false;
         runCountdown(function () {
           showHUD();
           startHUDUpdate();
+          showKeyHint();
         });
       };
       document.body.appendChild(s);
@@ -301,6 +313,7 @@ var gamePaused = false;
     gamePaused = true;
     stopHUDUpdate();
     hideHUD();
+    if (gameAudio) gameAudio.pause();
 
     var title = $('#result-title');
     var scoreV = $('#result-score');
