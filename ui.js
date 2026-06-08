@@ -495,8 +495,81 @@ var gamePaused = false;
       }
     });
 
+    // Background particles
+    initParticles();
+
+    // Button ripple effect
+    document.querySelectorAll('.btn').forEach(function (btn) {
+      btn.addEventListener('pointerdown', function (e) {
+        var rect = btn.getBoundingClientRect();
+        var ripple = document.createElement('span');
+        ripple.className = 'btn-ripple';
+        var size = Math.max(rect.width, rect.height);
+        ripple.style.width = ripple.style.height = size + 'px';
+        ripple.style.left = (e.clientX - rect.left - size / 2) + 'px';
+        ripple.style.top = (e.clientY - rect.top - size / 2) + 'px';
+        btn.appendChild(ripple);
+        setTimeout(function () {
+          if (ripple.parentNode) ripple.parentNode.removeChild(ripple);
+        }, 500);
+      });
+    });
+
     applyAudio();
     updateHighScoreDisplay();
   });
+
+  // ===== Background Particles =====
+  function initParticles() {
+    var canvas = document.getElementById('bg-particles');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    function resize() {
+      canvas.width = window.innerWidth;
+      canvas.height = window.innerHeight;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    var particles = [];
+    var count = 60;
+    for (var i = 0; i < count; i++) {
+      particles.push({
+        x: Math.random() * canvas.width,
+        y: Math.random() * canvas.height,
+        vx: (Math.random() - 0.5) * 0.3,
+        vy: (Math.random() - 0.5) * 0.3,
+        r: Math.random() * 1.5 + 0.5,
+        alpha: Math.random() * 0.4 + 0.1,
+        color: Math.random() > 0.5 ? '255,42,109' : '5,217,232'
+      });
+    }
+
+    function draw() {
+      if (currentScreen === 'playing') {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+        requestAnimationFrame(draw);
+        return;
+      }
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+      for (var i = 0; i < particles.length; i++) {
+        var p = particles[i];
+        p.x += p.vx;
+        p.y += p.vy;
+        if (p.x < 0) p.x = canvas.width;
+        if (p.x > canvas.width) p.x = 0;
+        if (p.y < 0) p.y = canvas.height;
+        if (p.y > canvas.height) p.y = 0;
+        ctx.beginPath();
+        ctx.arc(p.x, p.y, p.r, 0, Math.PI * 2);
+        ctx.fillStyle = 'rgba(' + p.color + ',' + p.alpha + ')';
+        ctx.fill();
+      }
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  }
 
 })();

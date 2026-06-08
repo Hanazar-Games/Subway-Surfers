@@ -659,6 +659,40 @@ html, body {
   .touch-controls { display: none !important; }
 }
 
+/* ===== Background Particles ===== */
+.bg-particles {
+  position: fixed; inset: 0;
+  z-index: 0;
+  pointer-events: none;
+}
+
+/* ===== Screen transitions ===== */
+.ui-screen {
+  transform: scale(1.02);
+}
+.ui-screen.hidden {
+  transform: scale(0.98);
+}
+
+/* ===== Button ripple effect ===== */
+.btn {
+  position: relative; overflow: hidden;
+}
+.btn-ripple {
+  position: absolute;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.3);
+  transform: scale(0);
+  animation: ripple-anim 0.5s linear;
+  pointer-events: none;
+}
+@keyframes ripple-anim {
+  to {
+    transform: scale(4);
+    opacity: 0;
+  }
+}
+
 /* ===== Key Hint Overlay ===== */
 .key-hint {
   position: fixed; bottom: 80px; left: 50%; transform: translateX(-50%);
