@@ -262,6 +262,7 @@ var gamePaused = false;
     var lastScore = -1, lastCoins = -1, lastTheme = -1;
     var scoreEl = $('#hud-score');
     var coinEl = $('#hud-coins');
+    var timeEl = $('#hud-time');
     var pBoots = $('#power-boots');
     var pFly = $('#power-fly');
     var pHover = $('#power-hover');
@@ -290,6 +291,13 @@ var gamePaused = false;
           coinEl.textContent = formatNum(coins_collected);
           popScore(coinEl);
         }
+      }
+      // Time
+      if (timeEl && typeof startTime !== 'undefined') {
+        var elapsed = Math.floor(Date.now() * 0.001 - startTime);
+        var m = Math.floor(elapsed / 60);
+        var s = elapsed % 60;
+        timeEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
       }
       // Theme
       if (typeof theme !== 'undefined' && theme !== lastTheme) {
