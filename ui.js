@@ -423,17 +423,25 @@ var gamePaused = false;
     var tJump = $('#touch-jump');
     var tDuck = $('#touch-duck');
     function emitKey(code) {
-      var ev = new KeyboardEvent('keydown', { keyCode: code, bubbles: true });
+      var ev = new KeyboardEvent('keydown', { bubbles: true });
+      Object.defineProperty(ev, 'keyCode', { value: code });
       document.dispatchEvent(ev);
       setTimeout(function () {
-        var up = new KeyboardEvent('keyup', { keyCode: code, bubbles: true });
+        var up = new KeyboardEvent('keyup', { bubbles: true });
+        Object.defineProperty(up, 'keyCode', { value: code });
         document.dispatchEvent(up);
       }, 80);
     }
-    if (tLeft)  tLeft.onpointerdown  = function (e) { e.preventDefault(); emitKey(37); };
-    if (tRight) tRight.onpointerdown = function (e) { e.preventDefault(); emitKey(39); };
-    if (tJump)  tJump.onpointerdown  = function (e) { e.preventDefault(); emitKey(38); };
-    if (tDuck)  tDuck.onpointerdown  = function (e) { e.preventDefault(); emitKey(40); };
+    function bindTouch(el, code) {
+      if (!el) return;
+      var handler = function (e) { e.preventDefault(); emitKey(code); };
+      el.addEventListener('pointerdown', handler, { passive: false });
+      el.addEventListener('touchstart', handler, { passive: false });
+    }
+    bindTouch(tLeft,  37);
+    bindTouch(tRight, 39);
+    bindTouch(tJump,  38);
+    bindTouch(tDuck,  40);
 
     // ESC to pause/resume
     document.addEventListener('keydown', function (e) {
