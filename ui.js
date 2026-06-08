@@ -273,18 +273,24 @@ var gamePaused = false;
       return;
     }
 
-    showScreen('playing');
-    hideHUD();
+    var loading = $('#loading-overlay');
+    if (loading) loading.classList.remove('hidden');
 
     if (typeof main !== 'function') {
       var s = document.createElement('script');
       s.src = './main.js';
       s.onload = function () {
+        if (loading) loading.classList.add('hidden');
+        showScreen('playing');
         runCountdown(function () {
           showHUD();
           startHUDUpdate();
           showKeyHint();
         });
+      };
+      s.onerror = function () {
+        if (loading) loading.classList.add('hidden');
+        alert('Failed to load game. Please refresh and try again.');
       };
       document.body.appendChild(s);
     } else {
