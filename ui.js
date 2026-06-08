@@ -526,6 +526,8 @@ var gamePaused = false;
     var btnSettingsBack = $('#btn-settings-back');
     var btnFullscreen = $('#btn-fullscreen');
     var btnWebglBack = $('#btn-webgl-back');
+    var btnShare = $('#btn-share');
+    var pauseVol = $('#pause-volume');
     var volMusic = $('#volume-music');
     var volSfx = $('#volume-sfx');
     var volMusicVal = $('#volume-music-value');
@@ -549,6 +551,28 @@ var gamePaused = false;
     if (btnSettingsBack) btnSettingsBack.onclick = function () { playClick(); showScreen('start'); };
     if (btnFullscreen) btnFullscreen.onclick = function () { playClick(); uiToggleFullscreen(); };
     if (btnWebglBack) btnWebglBack.onclick = function () { playClick(); showScreen('start'); };
+    if (btnShare) btnShare.onclick = function () {
+      playClick();
+      var text = 'I scored ' + formatNum(Math.floor(score || 0)) + ' in Subway Surfers! 🎮';
+      if (navigator.clipboard) {
+        navigator.clipboard.writeText(text).then(function () {
+          btnShare.textContent = '✅ Copied!';
+          setTimeout(function () { btnShare.textContent = '📋 Copy Score'; }, 1500);
+        });
+      } else {
+        btnShare.textContent = '❌ Failed';
+        setTimeout(function () { btnShare.textContent = '📋 Copy Score'; }, 1500);
+      }
+    };
+    if (pauseVol) {
+      var s = getAudioSettings();
+      pauseVol.value = s.music * 100;
+      pauseVol.oninput = function () {
+        s.music = pauseVol.value / 100;
+        saveAudioSettings(s);
+        applyAudio();
+      };
+    }
 
     // Audio sliders
     var s = getAudioSettings();
