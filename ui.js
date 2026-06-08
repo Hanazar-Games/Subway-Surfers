@@ -276,6 +276,22 @@ var gamePaused = false;
     location.reload();
   };
 
+  // ===== FPS Counter =====
+  var fpsEl = null;
+  var fpsVisible = false;
+  var lastFpsTime = 0;
+  var frameCount = 0;
+  window.uiUpdateFPS = function () {
+    if (!fpsVisible) return;
+    frameCount++;
+    var now = performance.now();
+    if (now - lastFpsTime >= 1000) {
+      if (fpsEl) fpsEl.textContent = frameCount + ' FPS';
+      frameCount = 0;
+      lastFpsTime = now;
+    }
+  };
+
   // ===== Public: Game Over =====
   window.uiGameOver = function (won, finalScore, finalCoins) {
     gamePaused = true;
@@ -298,7 +314,23 @@ var gamePaused = false;
     var isNewBest = setHighScore(finalScore);
     if (bestWrap) bestWrap.style.display = '';
     if (bestV) {
-      bestV.textContent = getHighScore() + (isNewBest ? ' ★' : '');
+      bestV.textContent = formatNum(getHighScore()) + (isNewBest ? ' ★' : '');
+    }
+
+    // New record celebration
+    var card = $('.glass-card', $('#gameover-overlay'));
+    if (isNewBest && card) {
+      var burst = document.createElement('div');
+      burst.className = 'new-record-burst';
+      card.appendChild(burst);
+      var recText = document.createElement('div');
+      recText.className = 'new-record-text';
+      recText.textContent = 'NEW RECORD!';
+      recText.style.marginBottom = '12px';
+      card.insertBefore(recText, card.firstChild.nextSibling);
+      setTimeout(function () {
+        if (burst.parentNode) burst.parentNode.removeChild(burst);
+      }, 1000);
     }
 
     showScreen('gameover');
@@ -323,6 +355,8 @@ var gamePaused = false;
     var volMusicVal = $('#volume-music-value');
     var volSfxVal = $('#volume-sfx-value');
     var toggleSplash = $('#toggle-splash');
+    var toggleFps = $('#toggle-fps');
+    fpsEl = $('#fps-counter');
 
     if (btnStart)  btnStart.onclick = function () { uiStartGame(); };
     if (btnHowto)  btnHowto.onclick = function () { showScreen('howto'); };
@@ -365,6 +399,17 @@ var gamePaused = false;
       toggleSplash.checked = sessionStorage.getItem('ss_skipSplash') !== 'true';
       toggleSplash.onchange = function () {
         sessionStorage.setItem('ss_skipSplash', toggleSplash.checked ? '' : 'true');
+      };
+    }
+    // FPS toggle
+    if (toggleFps) {
+      fpsVisible = localStorage.getItem('ss_showFps') === 'true';
+      toggleFps.checked = fpsVisible;
+      if (fpsEl) fpsEl.classList.toggle('visible', fpsVisible);
+      toggleFps.onchange = function () {
+        fpsVisible = toggleFps.checked;
+        localStorage.setItem('ss_showFps', fpsVisible ? 'true' : 'false');
+        if (fpsEl) fpsEl.classList.toggle('visible', fpsVisible);
       };
     }
 

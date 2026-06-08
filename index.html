@@ -118,7 +118,16 @@
         </label>
       </div>
 
-      <button id="btn-settings-back" class="btn btn-outline btn-sm" style="margin-top:16px;">← Back</button>
+      <div style="margin:8px 0; text-align:left;">
+        <label class="toggle-row">
+          <input type="checkbox" id="toggle-fps">
+          <span class="toggle-slider"></span>
+          <span class="toggle-label">Show FPS Counter</span>
+        </label>
+      </div>
+
+      <button id="btn-fullscreen" class="btn btn-outline btn-sm" style="margin-top:12px;">⛶ Fullscreen</button>
+      <button id="btn-settings-back" class="btn btn-outline btn-sm" style="margin-top:8px;">← Back</button>
     </div>
   </div>
 
@@ -163,6 +172,9 @@
       </div>
     </div>
   </div>
+
+  <!-- FPS Counter -->
+  <div id="fps-counter">0 FPS</div>
 
   <!-- Theme indicator (top center) -->
   <div id="hud-theme">City Theme</div>

@@ -397,6 +397,7 @@ function main() {
   var then = 0;
 
   function render(now) {
+    if (typeof uiUpdateFPS === 'function') uiUpdateFPS();
     if (gamePaused) {
       requestAnimationFrame(render);
       return;
