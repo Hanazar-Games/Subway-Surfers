@@ -615,6 +615,50 @@ html, body {
   opacity: 1;
 }
 
+/* ===== Touch Controls ===== */
+.touch-controls {
+  position: fixed; bottom: 20px; left: 0; right: 0;
+  z-index: 152;
+  display: flex; justify-content: center;
+  opacity: 0;
+  transition: opacity 0.3s;
+  pointer-events: none;
+}
+.touch-controls.visible {
+  opacity: 1;
+}
+.touch-controls > * { pointer-events: auto; }
+.touch-row {
+  display: flex; align-items: center; gap: 16px;
+}
+.touch-col {
+  display: flex; flex-direction: column; gap: 12px;
+}
+.touch-btn {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  border: 1.5px solid rgba(255,255,255,0.15);
+  background: rgba(0,0,0,0.35);
+  backdrop-filter: blur(6px);
+  color: #fff;
+  font-size: 22px;
+  display: flex; align-items: center; justify-content: center;
+  cursor: pointer;
+  user-select: none;
+  -webkit-tap-highlight-color: transparent;
+  transition: all 0.1s;
+  touch-action: manipulation;
+}
+.touch-btn:active {
+  background: rgba(255,42,109,0.25);
+  border-color: rgba(255,42,109,0.4);
+  transform: scale(0.92);
+}
+/* Hide touch controls on devices with fine pointer (mouse) */
+@media (pointer: fine) {
+  .touch-controls { display: none !important; }
+}
+
 /* ===== Responsive canvas sizing ===== */
 @media (max-width: 1320px) {
   #game-stage canvas {

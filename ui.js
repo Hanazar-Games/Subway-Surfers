@@ -45,11 +45,15 @@ var gamePaused = false;
     screens.hud.classList.add('visible');
     var hs = $('#hud-highscore');
     if (hs) hs.classList.add('visible');
+    var tc = $('#touch-controls');
+    if (tc) tc.classList.add('visible');
   }
   function hideHUD() {
     screens.hud.classList.remove('visible');
     var hs = $('#hud-highscore');
     if (hs) hs.classList.remove('visible');
+    var tc = $('#touch-controls');
+    if (tc) tc.classList.remove('visible');
   }
 
   // ===== Countdown =====
@@ -412,6 +416,24 @@ var gamePaused = false;
         if (fpsEl) fpsEl.classList.toggle('visible', fpsVisible);
       };
     }
+
+    // Touch controls
+    var tLeft = $('#touch-left');
+    var tRight = $('#touch-right');
+    var tJump = $('#touch-jump');
+    var tDuck = $('#touch-duck');
+    function emitKey(code) {
+      var ev = new KeyboardEvent('keydown', { keyCode: code, bubbles: true });
+      document.dispatchEvent(ev);
+      setTimeout(function () {
+        var up = new KeyboardEvent('keyup', { keyCode: code, bubbles: true });
+        document.dispatchEvent(up);
+      }, 80);
+    }
+    if (tLeft)  tLeft.onpointerdown  = function (e) { e.preventDefault(); emitKey(37); };
+    if (tRight) tRight.onpointerdown = function (e) { e.preventDefault(); emitKey(39); };
+    if (tJump)  tJump.onpointerdown  = function (e) { e.preventDefault(); emitKey(38); };
+    if (tDuck)  tDuck.onpointerdown  = function (e) { e.preventDefault(); emitKey(40); };
 
     // ESC to pause/resume
     document.addEventListener('keydown', function (e) {
