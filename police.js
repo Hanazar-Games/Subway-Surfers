@@ -232,6 +232,15 @@ let Police = class {
             this.pos
         );
 
+        // Running animation synced with player chase
+        var runFactor = 1.0;
+        if (this.pos[1] > -3.5) runFactor = 0.2;
+        else if (this.pos[1] < -4.2) runFactor = 0.5;
+        var t = Date.now() * 0.015;
+        var bob = Math.sin(t) * 0.04 * runFactor;
+        var sway = Math.cos(t * 0.5) * 0.015 * runFactor;
+        mat4.translate(modelViewMatrix, modelViewMatrix, [sway, bob, 0]);
+
         mat4.rotate(modelViewMatrix,
             modelViewMatrix,
             this.rotation,

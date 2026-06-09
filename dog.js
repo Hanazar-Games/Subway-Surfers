@@ -198,6 +198,13 @@ let Dog = class {
             this.pos
         );
 
+        // Dog running animation: quick bobbing
+        var runFactor = 1.0;
+        if (this.pos[1] > -4.0) runFactor = 0.3;
+        var t = Date.now() * 0.025;
+        var bob = Math.sin(t) * 0.03 * runFactor;
+        mat4.translate(modelViewMatrix, modelViewMatrix, [0, bob, 0]);
+
         mat4.rotate(modelViewMatrix,
             modelViewMatrix,
             this.rotation,
