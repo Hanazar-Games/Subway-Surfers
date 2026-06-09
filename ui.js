@@ -72,11 +72,13 @@ var gamePaused = false;
         numEl.style.animation = 'none';
         void numEl.offsetWidth;
         numEl.style.animation = '';
+        if (typeof flashScreen === 'function') flashScreen('rgba(255,255,255,0.15)', 0.15);
       } else if (count === 0) {
         numEl.textContent = 'GO!';
         numEl.style.animation = 'none';
         void numEl.offsetWidth;
         numEl.style.animation = '';
+        if (typeof flashScreen === 'function') flashScreen('rgba(5,217,232,0.25)', 0.3);
         setTimeout(function () {
           overlay.style.display = 'none';
           if (cb) cb();

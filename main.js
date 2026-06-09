@@ -718,11 +718,14 @@ function main() {
         var rect = document.getElementById('glcanvas').getBoundingClientRect();
         showComboText(lastMilestone + 'm', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
       }
-      for (var p = 0; p < 10; p++) {
+      // Firework burst
+      for (var p = 0; p < 24; p++) {
+        var angle = Math.random() * Math.PI * 2;
+        var speed = 2.0 + Math.random() * 4.0;
         particles.push(new Particle(gl,
-          [player.pos[0] + (Math.random()-0.5)*2, player.pos[1] + Math.random()*2, player.pos[2]],
-          [(Math.random()-0.5)*3, Math.random()*3+1, (Math.random()-0.5)*3],
-          0.5 + Math.random()*0.3, glow_gold_texture));
+          [player.pos[0] + (Math.random()-0.5)*0.5, player.pos[1] + 0.5, player.pos[2]],
+          [Math.cos(angle)*speed, Math.random()*5.0 + 2.0, Math.sin(angle)*speed],
+          0.6 + Math.random()*0.4, glow_gold_texture));
       }
     }
 
