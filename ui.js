@@ -329,15 +329,18 @@ var gamePaused = false;
         if (fBoots && typeof boots_acquired !== 'undefined' && bActive) {
           var rem = Math.max(0, 10 - (now - boots_acquired));
           fBoots.style.transform = 'scaleX(' + (rem / 10) + ')';
-        } else if (fBoots) { fBoots.style.transform = 'scaleX(0)'; }
+          if (pBoots) pBoots.classList.toggle('warning', rem < 3);
+        } else if (fBoots) { fBoots.style.transform = 'scaleX(0)'; if (pBoots) pBoots.classList.remove('warning'); }
         if (fFly && typeof fb_acquired !== 'undefined' && fActive) {
           var rem = Math.max(0, 10 - (now - fb_acquired));
           fFly.style.transform = 'scaleX(' + (rem / 10) + ')';
-        } else if (fFly) { fFly.style.transform = 'scaleX(0)'; }
+          if (pFly) pFly.classList.toggle('warning', rem < 3);
+        } else if (fFly) { fFly.style.transform = 'scaleX(0)'; if (pFly) pFly.classList.remove('warning'); }
         if (fHover && typeof hoverboard_acquired !== 'undefined' && hActive) {
           var rem = Math.max(0, 10 - (now - hoverboard_acquired));
           fHover.style.transform = 'scaleX(' + (rem / 10) + ')';
-        } else if (fHover) { fHover.style.transform = 'scaleX(0)'; }
+          if (pHover) pHover.classList.toggle('warning', rem < 3);
+        } else if (fHover) { fHover.style.transform = 'scaleX(0)'; if (pHover) pHover.classList.remove('warning'); }
       }
     }, 80);
   }

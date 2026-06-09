@@ -646,6 +646,10 @@ function main() {
     player.pos[2] -= player.speedz;
     cam_z -= player.speedz;
     dog.pos[2] -= player.speedz;
+
+    // recover tilt back to upright
+    if (player.tilt > 0) { player.tilt -= 0.02; if (player.tilt < 0) player.tilt = 0; }
+    if (player.tilt < 0) { player.tilt += 0.02; if (player.tilt > 0) player.tilt = 0; }
     d = new Date();
     if (d.getTime() * 0.001 - policeCaughtUp >= 5 && d.getTime() * 0.001 - policeCaughtUp <= 10)
       police.speedz = player_speed / 2;

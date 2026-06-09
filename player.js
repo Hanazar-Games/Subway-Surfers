@@ -216,6 +216,7 @@ let Player = class {
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(headVertexNormals), gl.STATIC_DRAW);
 
         this.rotation = 0.0;
+        this.tilt = 0.0;
         this.speedx = 0;
         this.speedy = 0.05;
         this.speedz = 0;
@@ -260,6 +261,9 @@ let Player = class {
         var bob = Math.sin(t) * 0.04 * runFactor;
         var sway = Math.cos(t * 0.5) * 0.015 * runFactor;
         mat4.translate(modelViewMatrix, modelViewMatrix, [sway, bob, 0]);
+
+        // Side-to-side lean when moving laterally
+        mat4.rotate(modelViewMatrix, modelViewMatrix, this.tilt, [0, 0, 1]);
 
         mat4.rotate(modelViewMatrix,
             modelViewMatrix,
