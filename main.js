@@ -24,6 +24,7 @@ var rope_stop = new Array();
 var boots = new Array();
 var flying_boost = new Array();
 var hoverboard = new Array();
+var particles = new Array();
 
 var player_texture, police_texture, dog_texture;
 var track_texture;
@@ -37,8 +38,10 @@ var stop_texture, stand_texture;
 var boots_texture;
 var fb_texture;
 var hoverboard_texture;
+var particle_texture;
 
 var cam_x = 0, cam_y = 5, cam_z = 13.0;
+var cameraShake = 0;
 var target_x = 0, target_y = 0, target_z = cam_z - 10;
 var d, startTime, policeCaughtUp, obstacle_hit_time, flash_start_time, boots_acquired, fb_acquired, hoverboard_acquired;
 var theme = 1;
@@ -185,6 +188,7 @@ function main() {
   fb_texture = loadTexture(gl, 'assets/1_FlyingBoost.jpeg');
   hoverboard_texture = loadTexture(gl, 'assets/1_Hoverboard.jpeg');
   dog_texture = loadTexture(gl, 'assets/1_Dog.jpeg');
+  particle_texture = loadTexture(gl, 'assets/1_Coin.jpg');
 
   const programInfo = {
     program: shaderProgram,
@@ -578,6 +582,13 @@ function main() {
             if (coins[i].pos[2] >= player.pos[2] - 0.5 && coins[i].pos[2] <= player.pos[2] + 0.5) {
               coins[i].exist = false;
               coins_collected += 1;
+              // Spawn sparkle particles on coin collect
+              for (var p = 0; p < 6; p++) {
+                var vx = (Math.random() - 0.5) * 4.0;
+                var vy = Math.random() * 3.0 + 1.5;
+                var vz = (Math.random() - 0.5) * 4.0;
+                particles.push(new Particle(gl, [coins[i].pos[0], coins[i].pos[1], coins[i].pos[2]], [vx, vy, vz], 0.5 + Math.random() * 0.3));
+              }
             }
           }
         }
@@ -591,6 +602,7 @@ function main() {
           if (player.pos[1] >= trainF[i].pos[1] - 4 && player.pos[1] <= trainF[i].pos[1] + 4) {
             if (player.pos[2] >= trainF[i].pos[2] - 18 && player.pos[2] <= trainF[i].pos[2]) {
               score = -player.pos[2] + coins_collected;
+              cameraShake = 0.6;
               Die();
               if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
@@ -605,6 +617,7 @@ function main() {
           if (player.pos[1] >= boxes[i].pos[1] - 2 && player.pos[1] <= boxes[i].pos[1] + 2) {
             if (player.pos[2] <= boxes[i].pos[2] + 3 && player.pos[2] >= boxes[i].pos[2] - 3) {
               score = -player.pos[2] + coins_collected;
+              cameraShake = 0.6;
               Die();
               if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
@@ -619,6 +632,7 @@ function main() {
           if (player.pos[1] <= -4) {
             if (player.pos[2] <= manholes[i].pos[2] + 2.3 && player.pos[2] >= manholes[i].pos[2] - 2.3) {
               score = -player.pos[2] + coins_collected;
+              cameraShake = 0.6;
               Die();
               if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
@@ -638,6 +652,7 @@ function main() {
                   if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
                 }
                 else {
+                  cameraShake = 0.3;
                   obstacle_hit = i;
                   player.speedz = player_speed / 2;
                   policeCaughtUp = d.getTime() * 0.001;
@@ -662,6 +677,7 @@ function main() {
                   if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
                 }
                 else {
+                  cameraShake = 0.3;
                   obstacle_hit = i;
                   player.speedz = player_speed / 2;
                   policeCaughtUp = d.getTime() * 0.001;
@@ -685,6 +701,7 @@ function main() {
                 if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
               }
               else {
+                cameraShake = 0.3;
                 obstacle_hit = i;
                 player.speedz = player_speed / 2;
                 policeCaughtUp = d.getTime() * 0.001;
@@ -815,6 +832,24 @@ function main() {
       if (typeof uiGameOver === 'function') { uiGameOver(true, score, coins_collected); return; }
     }
 
+    // update particles
+    for (var i = particles.length - 1; i >= 0; i--) {
+      particles[i].update(deltaTime);
+      if (particles[i].life <= 0) {
+        particles.splice(i, 1);
+      }
+    }
+
+    // apply camera shake (collision / impact feedback)
+    var origCamX = cam_x;
+    var origCamY = cam_y;
+    if (cameraShake > 0) {
+      cam_x += (Math.random() - 0.5) * cameraShake;
+      cam_y += (Math.random() - 0.5) * cameraShake;
+      cameraShake *= 0.85;
+      if (cameraShake < 0.02) cameraShake = 0;
+    }
+
     if (greyScale) {
       drawScene(gl, programInfobw, deltaTime);
     }
@@ -830,6 +865,11 @@ function main() {
     else {
       drawScene(gl, programInfo, deltaTime);
     }
+
+    // restore camera position after shake
+    cam_x = origCamX;
+    cam_y = origCamY;
+
     requestAnimationFrame(render);
   }
   requestAnimationFrame(render);
@@ -936,6 +976,11 @@ function drawScene(gl, programInfo, deltaTime) {
   for (var i = 0; i < num_coins; i++) {
     if (coins[i].exist == true)
       coins[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+  }
+
+  // draw particles on top of coins
+  for (var i = 0; i < particles.length; i++) {
+    particles[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 
   var num_trains = trainF.length;
