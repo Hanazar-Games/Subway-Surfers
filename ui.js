@@ -428,11 +428,15 @@ var gamePaused = false;
     if (currentScreen !== 'playing') return;
     gamePaused = true;
     if (gameAudio) gameAudio.pause();
+    var flash = document.getElementById('screen-flash');
+    if (flash) { flash.style.background = 'rgba(0,0,0,0.4)'; flash.style.opacity = '1'; flash.style.transition = 'opacity 0.3s'; }
     showScreen('pause');
   };
 
   // ===== Public: Resume =====
   window.uiResumeGame = function () {
+    var flash = document.getElementById('screen-flash');
+    if (flash) { flash.style.opacity = '0'; }
     showScreen('playing');
     showHUD();
     if (gameAudio) gameAudio.play().catch(function () {});
