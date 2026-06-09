@@ -75,6 +75,7 @@ var multiplierStreak = 0;
 var lastCoinTime = 0;
 var trailTimer = 0;
 var sparkTimer = 0;
+var lastMilestone = 0;
 
 var cubeRotation = 0;
 
@@ -102,12 +103,15 @@ function playCoinSound() {
     initSfx();
     resumeSfx();
     if (!audioCtx) return;
+    var mult = typeof scoreMultiplier !== 'undefined' ? scoreMultiplier : 1;
     var t = audioCtx.currentTime;
     var osc = audioCtx.createOscillator();
     var gain = audioCtx.createGain();
     osc.type = 'sine';
-    osc.frequency.setValueAtTime(1100, t);
-    osc.frequency.exponentialRampToValueAtTime(1900, t + 0.08);
+    var baseFreq = 1100 + (mult - 1) * 300;
+    var peakFreq = 1900 + (mult - 1) * 400;
+    osc.frequency.setValueAtTime(baseFreq, t);
+    osc.frequency.exponentialRampToValueAtTime(peakFreq, t + 0.08);
     gain.gain.setValueAtTime(0, t);
     gain.gain.linearRampToValueAtTime(0.25, t + 0.01);
     gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
@@ -669,6 +673,23 @@ function main() {
     police.pos[0] = player.pos[0];
     police.pos[1] = player.pos[1];
     dog.pos[0] = player.pos[0] + 2;
+
+    // Distance milestone celebration
+    var dist = Math.floor(-player.pos[2]);
+    if (dist >= lastMilestone + 100) {
+      lastMilestone = dist - (dist % 100);
+      if (typeof flashScreen === 'function') flashScreen('#ffffff', 0.2);
+      if (typeof showComboText === 'function') {
+        var rect = document.getElementById('glcanvas').getBoundingClientRect();
+        showComboText(lastMilestone + 'm', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
+      }
+      for (var p = 0; p < 10; p++) {
+        particles.push(new Particle(gl,
+          [player.pos[0] + (Math.random()-0.5)*2, player.pos[1] + Math.random()*2, player.pos[2]],
+          [(Math.random()-0.5)*3, Math.random()*3+1, (Math.random()-0.5)*3],
+          0.5 + Math.random()*0.3, glow_gold_texture));
+      }
+    }
 
     if (!player.fly_boost) {
       // jump
