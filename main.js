@@ -699,6 +699,15 @@ function main() {
         obstacle_hit = -1;
         player.speedz = player_speed;
         policeCaughtUp = d.getTime() * 0.001;
+        // Recovery celebration
+        if (typeof flashScreen === 'function') flashScreen('rgba(0,255,136,0.1)', 0.2);
+        if (typeof showComboText === 'function') {
+          var rect = document.getElementById('glcanvas').getBoundingClientRect();
+          showComboText('Recovered!', rect.left + rect.width / 2, rect.top + rect.height * 0.3);
+        }
+        for (var p = 0; p < 6; p++) {
+          particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [(Math.random()-0.5)*2, Math.random()*2+0.5, (Math.random()-0.5)*2], 0.4, glow_cyan_texture));
+        }
       }
     }
 
