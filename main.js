@@ -49,6 +49,7 @@ var glow_cyan_texture, glow_pink_texture, glow_gold_texture;
 var themeTextures = {1: {}, 2: {}};
 
 var cam_x = 0, cam_y = 5, cam_z = 13.0;
+var cam_y_target = 5;
 var cameraShake = 0;
 var target_x = 0, target_y = 0, target_z = cam_z - 10;
 var d, startTime, policeCaughtUp, obstacle_hit_time, flash_start_time, boots_acquired, fb_acquired, hoverboard_acquired;
@@ -629,8 +630,7 @@ function main() {
         player.fly_boost = false;
         player.pos[1] = -4;
         dog.pos[2] = player.pos[2] + 2;
-        cam_y = 5;
-        target_y = 0;
+        cam_y_target = 5;
         jumping = false;
       }
     }
@@ -646,6 +646,11 @@ function main() {
     player.pos[2] -= player.speedz;
     cam_z -= player.speedz;
     dog.pos[2] -= player.speedz;
+
+    // smooth camera vertical follow
+    var camDiff = cam_y_target - cam_y;
+    cam_y += camDiff * 0.08;
+    target_y = cam_y - 5;
 
     // recover tilt back to upright
     if (player.tilt > 0) { player.tilt -= 0.02; if (player.tilt < 0) player.tilt = 0; }
@@ -671,6 +676,13 @@ function main() {
         player.pos[1] += player.speedy;
         player.speedy -= 0.01;
         police.pos[1] = player.pos[1];
+        // Wind streak particles on jump
+        if (Math.random() < 0.3) {
+          particles.push(new Particle(gl,
+            [player.pos[0] + (Math.random()-0.5)*0.5, player.pos[1] - 0.5, player.pos[2] + 1.0],
+            [(Math.random()-0.5)*0.5, -0.5 - Math.random(), 3.0 + Math.random()*2.0],
+            0.15 + Math.random()*0.1, dust_texture));
+        }
         if (player.pos[1] >= jump_height) {
           player.pos[1] = jump_height;
           jumping = false;
@@ -1052,8 +1064,7 @@ function main() {
               }
               dog.pos[2] -= 10;
               player.pos[1] = 10;
-              cam_y = player.pos[1] + 9;
-              target_y = player.pos[1] + 4;
+              cam_y_target = player.pos[1] + 9;
               d = new Date();
               fb_acquired = d.getTime() * 0.001;
               jumping = false;
