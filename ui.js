@@ -801,6 +801,18 @@ var gamePaused = false;
   }
 
   // ===== Floating combo text =====
+  window.flashScreen = function(color, duration) {
+    var el = document.getElementById('screen-flash');
+    if (!el) return;
+    el.style.background = color || '#fff';
+    el.style.opacity = '0.4';
+    el.style.transition = 'none';
+    // Force reflow
+    void el.offsetWidth;
+    el.style.transition = 'opacity ' + (duration || 0.3) + 's ease-out';
+    el.style.opacity = '0';
+  };
+
   window.showComboText = function(text, x, y) {
     var el = document.createElement('div');
     el.textContent = text;

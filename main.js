@@ -788,6 +788,7 @@ function main() {
                 var screenX = rect.left + rect.width / 2 + (player.pos[0] / 6) * rect.width * 0.3;
                 var screenY = rect.top + rect.height * 0.4;
                 showComboText('x' + scoreMultiplier + '!', screenX, screenY);
+                if (typeof flashScreen === 'function') flashScreen('#05d9e8', 0.25);
               }
               coins_collected += scoreMultiplier;
               playCoinSound();
@@ -812,6 +813,7 @@ function main() {
             if (player.pos[2] >= trainF[i].pos[2] - 18 && player.pos[2] <= trainF[i].pos[2]) {
               score = -player.pos[2] + coins_collected;
               cameraShake = 0.6;
+              if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               Die();
               if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
@@ -827,6 +829,7 @@ function main() {
             if (player.pos[2] <= boxes[i].pos[2] + 3 && player.pos[2] >= boxes[i].pos[2] - 3) {
               score = -player.pos[2] + coins_collected;
               cameraShake = 0.6;
+              if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               Die();
               if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
@@ -842,6 +845,7 @@ function main() {
             if (player.pos[2] <= manholes[i].pos[2] + 2.3 && player.pos[2] >= manholes[i].pos[2] - 2.3) {
               score = -player.pos[2] + coins_collected;
               cameraShake = 0.6;
+              if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               Die();
               if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
@@ -863,6 +867,7 @@ function main() {
                 else {
                   cameraShake = 0.3;
                   playBumpSound();
+                  if (typeof flashScreen === 'function') flashScreen('#ff8800', 0.15);
                   obstacle_hit = i;
                   player.speedz = player_speed / 2;
                   policeCaughtUp = d.getTime() * 0.001;
@@ -889,6 +894,7 @@ function main() {
                 else {
                   cameraShake = 0.3;
                   playBumpSound();
+                  if (typeof flashScreen === 'function') flashScreen('#ff8800', 0.15);
                   obstacle_hit = i;
                   player.speedz = player_speed / 2;
                   policeCaughtUp = d.getTime() * 0.001;
@@ -969,6 +975,7 @@ function main() {
               boots[i].exist = false;
               player.jumping_boots = true;
               playPowerUpSound();
+              if (typeof flashScreen === 'function') flashScreen('#05d9e8', 0.4);
               d = new Date();
               boots_acquired = d.getTime() * 0.001;
               jump_height = 3;
@@ -990,6 +997,7 @@ function main() {
               flying_boost[i].exist = false;
               player.fly_boost = true;
               playPowerUpSound();
+              if (typeof flashScreen === 'function') flashScreen('#ff2a6d', 0.4);
               dog.pos[2] -= 10;
               player.pos[1] = 10;
               cam_y = player.pos[1] + 9;
@@ -1033,6 +1041,7 @@ function main() {
               hoverboard[i].exist = false;
               player.hoverboard = true;
               playPowerUpSound();
+              if (typeof flashScreen === 'function') flashScreen('#ffd700', 0.4);
               d = new Date();
               hoverboard_acquired = d.getTime() * 0.001;
               jumping = false;
