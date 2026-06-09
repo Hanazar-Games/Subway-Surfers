@@ -91,6 +91,9 @@ let Coin = class {
         var floatY = Math.sin(t) * 0.08;
         mat4.translate(modelViewMatrix, modelViewMatrix, [0, floatY, 0]);
 
+        // Spin animation
+        this.rotation += this.speed;
+
         mat4.rotate(modelViewMatrix,
             modelViewMatrix,
             this.rotation,

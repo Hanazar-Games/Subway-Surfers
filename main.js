@@ -967,6 +967,8 @@ function main() {
         var distSq = dx*dx + dy*dy + dz*dz;
         if (distSq < 36.0) { // within 6 units
           var pull = 0.08;
+          // Coin spins faster when being pulled
+          coins[i].speed = 0.3;
           // Coin trail when being pulled
           if (Math.random() < 0.25) {
             particles.push(new Particle(gl,
@@ -1408,6 +1410,14 @@ function main() {
       particles[i].update(deltaTime * timeDilation);
       if (particles[i].life <= 0) {
         particles.splice(i, 1);
+      }
+    }
+
+    // Coin spin speed recovery
+    for (var i = 0; i < coins.length; i++) {
+      if (coins[i].speed > 0.1) {
+        coins[i].speed -= 0.005;
+        if (coins[i].speed < 0.1) coins[i].speed = 0.1;
       }
     }
 
