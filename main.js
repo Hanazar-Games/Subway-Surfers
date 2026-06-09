@@ -80,6 +80,7 @@ var nearMissTimer = 0;
 var envParticles = []; // ambient floating dust
 var dying = false;
 var deathTimer = 0;
+var timeDilation = 1.0;
 
 var cubeRotation = 0;
 
@@ -681,10 +682,17 @@ function main() {
       }
     }
 
+    // Time dilation (near-miss slow-mo effect)
+    if (timeDilation < 1.0) {
+      timeDilation += 0.03;
+      if (timeDilation > 1.0) timeDilation = 1.0;
+    }
+
     // move forward
-    player.pos[2] -= player.speedz;
-    cam_z -= player.speedz;
-    dog.pos[2] -= player.speedz;
+    var effectiveSpeed = player.speedz * timeDilation;
+    player.pos[2] -= effectiveSpeed;
+    cam_z -= effectiveSpeed;
+    dog.pos[2] -= effectiveSpeed;
 
     // smooth camera vertical follow
     var camDiff = cam_y_target - cam_y;
@@ -851,17 +859,18 @@ function main() {
     // train movement
     var num_trains = trainF.length;
     for (var i = 0; i < num_trains; i++) {
-      trainF[i].pos[2] += train_speeds[i];
-      trainT[i].pos[2] += train_speeds[i];
-      trainL[i].pos[2] += train_speeds[i];
-      trainR[i].pos[2] += train_speeds[i];
+      var tSpeed = train_speeds[i] * timeDilation;
+      trainF[i].pos[2] += tSpeed;
+      trainT[i].pos[2] += tSpeed;
+      trainL[i].pos[2] += tSpeed;
+      trainR[i].pos[2] += tSpeed;
       // Sync extra parts (bottom, back, 4 wheels) with the train
       for (var j = 0; j < 6; j++) {
-        trainExtra[i * 6 + j].pos[2] += train_speeds[i];
+        trainExtra[i * 6 + j].pos[2] += tSpeed;
       }
       // Rotate wheels based on speed (scaled for visual effect)
       for (var j = 2; j < 6; j++) {
-        trainExtra[i * 6 + j].rotation += train_speeds[i] * 0.5;
+        trainExtra[i * 6 + j].rotation += tSpeed * 0.5;
       }
     }
 
@@ -876,6 +885,13 @@ function main() {
         var distSq = dx*dx + dy*dy + dz*dz;
         if (distSq < 36.0) { // within 6 units
           var pull = 0.08;
+          // Coin trail when being pulled
+          if (Math.random() < 0.25) {
+            particles.push(new Particle(gl,
+              [coins[i].pos[0], coins[i].pos[1], coins[i].pos[2]],
+              [(Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5],
+              0.2 + Math.random()*0.15, glow_gold_texture));
+          }
           coins[i].pos[0] += dx * pull;
           coins[i].pos[1] += dy * pull;
           coins[i].pos[2] += dz * pull;
@@ -955,6 +971,7 @@ function main() {
               for (var p = 0; p < 6; p++) {
                 particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [(Math.random()-0.5)*3, Math.random()*2+1, (Math.random()-0.5)*3], 0.4, glow_gold_texture));
               }
+              timeDilation = 0.3; // brief slow-mo on near miss
             }
           }
         }
@@ -1127,7 +1144,7 @@ function main() {
     var num_boots = boots.length;
     for (var i = 0; i < num_boots; i++) {
       if (boots[i].exist) {
-        boots[i].rotation += 0.3;
+        boots[i].rotation += 0.3 * timeDilation;
         if (player.pos[0] == boots[i].pos[0]) {
           if (player.pos[1] >= boots[i].pos[1] - 1.2 && player.pos[1] <= boots[i].pos[1] + 1.2) {
             if (player.pos[2] >= boots[i].pos[2] - 1.2 && player.pos[2] <= boots[i].pos[2] + 1.2) {
@@ -1155,7 +1172,7 @@ function main() {
     var num_fb = flying_boost.length;
     for (var i = 0; i < num_fb; i++) {
       if (flying_boost[i].exist) {
-        flying_boost[i].rotation += 0.1;
+        flying_boost[i].rotation += 0.1 * timeDilation;
         if (player.pos[0] == flying_boost[i].pos[0]) {
           if (player.pos[1] >= flying_boost[i].pos[1] - 1.75 && player.pos[1] <= flying_boost[i].pos[1] + 1.75) {
             if (player.pos[2] >= flying_boost[i].pos[2] - 1.75 && player.pos[2] <= flying_boost[i].pos[2] + 1.75) {
@@ -1203,7 +1220,7 @@ function main() {
 
     // collision with hoverboard
     for (var i = 0; i < 2; i++) {
-      hoverboard[i].rotation += 0.2;
+      hoverboard[i].rotation += 0.2 * timeDilation;
       if (hoverboard[i].exist) {
         if (player.pos[0] == hoverboard[i].pos[0]) {
           if (player.pos[1] >= hoverboard[i].pos[1] - 1.2 && player.pos[1] <= hoverboard[i].pos[1] + 1.2) {
@@ -1240,7 +1257,7 @@ function main() {
     }
 
     // Trail particles for hoverboard / flying boost
-    trailTimer += deltaTime;
+    trailTimer += deltaTime * timeDilation;
     if (trailTimer > 0.05) {
       trailTimer = 0;
       if (player.hoverboard) {
@@ -1262,7 +1279,7 @@ function main() {
     }
 
     // Train spark particles when train is close behind
-    sparkTimer += deltaTime;
+    sparkTimer += deltaTime * timeDilation;
     if (sparkTimer > 0.08) {
       sparkTimer = 0;
       var num_trains = trainF.length;
@@ -1287,7 +1304,7 @@ function main() {
 
     // update particles
     for (var i = particles.length - 1; i >= 0; i--) {
-      particles[i].update(deltaTime);
+      particles[i].update(deltaTime * timeDilation);
       if (particles[i].life <= 0) {
         particles.splice(i, 1);
       }
@@ -1295,11 +1312,12 @@ function main() {
 
     // update ambient dust particles
     var dustTime = Date.now() * 0.001;
+    var envDt = deltaTime * timeDilation;
     for (var i = 0; i < envParticles.length; i++) {
       var ep = envParticles[i];
-      ep.pos[0] += ep.vel[0] * deltaTime;
-      ep.pos[1] += ep.vel[1] * deltaTime + Math.sin(dustTime + ep.phase) * 0.002;
-      ep.pos[2] += ep.vel[2] * deltaTime;
+      ep.pos[0] += ep.vel[0] * envDt;
+      ep.pos[1] += ep.vel[1] * envDt + Math.sin(dustTime + ep.phase) * 0.002;
+      ep.pos[2] += ep.vel[2] * envDt;
       // wrap around relative to camera
       if (ep.pos[2] > cam_z + 5) ep.pos[2] -= 90;
       if (ep.pos[2] < cam_z - 85) ep.pos[2] += 90;
