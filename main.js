@@ -684,11 +684,18 @@ function main() {
       deathTimer += deltaTime;
       player.speedz *= 0.85;
       cameraShake *= 0.9;
-      if (deathTimer > 0.6) {
+      cam_z_target += 0.15; // camera pulls back on death
+      if (deathTimer > 0.8) {
         dying = false;
         deathTimer = 0;
+        cam_z_target = 13.0;
         if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); }
         return;
+      }
+      // Vignette darkening via screen flash overlay
+      if (typeof flashScreen === 'function' && deathTimer > 0.3) {
+        var darken = Math.min(0.4, (deathTimer - 0.3) * 0.8);
+        flashScreen('rgba(0,0,0,' + darken + ')', 0.05);
       }
     }
 
