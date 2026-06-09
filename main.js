@@ -524,6 +524,13 @@ function main() {
       }
     }
 
+    // Difficulty scaling: speed slowly increases with distance
+    var distance = -player.pos[2];
+    player_speed = 0.5 + Math.min(0.5, distance / 3000);
+    if (obstacle_hit == -1) {
+      player.speedz = player_speed;
+    }
+
     if (player.jumping_boots) {
       if (d.getTime() * 0.001 - boots_acquired >= 10) {
         player.jumping_boots = false;
