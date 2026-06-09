@@ -39,6 +39,7 @@ var boots_texture;
 var fb_texture;
 var hoverboard_texture;
 var particle_texture;
+var dust_texture;
 
 var cam_x = 0, cam_y = 5, cam_z = 13.0;
 var cameraShake = 0;
@@ -52,6 +53,7 @@ var jump_height = 0;
 var duck_ground = -5;
 var jumping = false;
 var ducking = false;
+var wasInAir = false;
 var greyScale = false;
 var flashing = false;
 var train_speeds = new Array();
@@ -273,6 +275,7 @@ function main() {
   hoverboard_texture = loadTexture(gl, 'assets/1_Hoverboard.jpeg');
   dog_texture = loadTexture(gl, 'assets/1_Dog.jpeg');
   particle_texture = loadTexture(gl, 'assets/1_Coin.jpg');
+  dust_texture = loadTexture(gl, 'assets/1_Dust.png');
 
   const programInfo = {
     program: shaderProgram,
@@ -586,6 +589,7 @@ function main() {
           player.pos[1] = jump_height;
           jumping = false;
           player.speedy = 0.05;
+          wasInAir = true;
         }
       }
 
@@ -618,6 +622,15 @@ function main() {
             }
           }
           if (player.pos[1] < -4 && !ducking) {
+            if (wasInAir) {
+              wasInAir = false;
+              for (var p = 0; p < 8; p++) {
+                var vx = (Math.random() - 0.5) * 3.0;
+                var vy = Math.random() * 2.0 + 0.5;
+                var vz = (Math.random() - 0.5) * 3.0;
+                particles.push(new Particle(gl, [player.pos[0], -4.2, player.pos[2]], [vx, vy, vz], 0.4 + Math.random() * 0.3, dust_texture));
+              }
+            }
             player.pos[1] = -4;
             player.speedy = 0;
           }
@@ -639,6 +652,15 @@ function main() {
         if (player.pos[1] < -4) {
           player.pos[1] += player.speedy;
           if (player.pos[1] > -4 && !jumping) {
+            if (wasInAir) {
+              wasInAir = false;
+              for (var p = 0; p < 8; p++) {
+                var vx = (Math.random() - 0.5) * 3.0;
+                var vy = Math.random() * 2.0 + 0.5;
+                var vz = (Math.random() - 0.5) * 3.0;
+                particles.push(new Particle(gl, [player.pos[0], -4.2, player.pos[2]], [vx, vy, vz], 0.4 + Math.random() * 0.3, dust_texture));
+              }
+            }
             player.pos[1] = -4;
             player.speedy = 0.05;
           }

@@ -2,12 +2,13 @@
 
 // Simple billboard particle (small golden square)
 let Particle = class {
-    constructor(gl, pos, velocity, life) {
+    constructor(gl, pos, velocity, life, texture) {
         this.pos = pos.slice();
         this.velocity = velocity.slice();
         this.life = life;
         this.maxLife = life;
         this.size = 0.15 + Math.random() * 0.1;
+        this.texture = texture || particle_texture;
 
         this.positionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
@@ -82,7 +83,7 @@ let Particle = class {
         gl.uniformMatrix4fv(programInfo.uniformLocations.normalMatrix, false, normalMatrix);
 
         gl.activeTexture(gl.TEXTURE0);
-        gl.bindTexture(gl.TEXTURE_2D, particle_texture);
+        gl.bindTexture(gl.TEXTURE_2D, this.texture || particle_texture);
         gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
 
         gl.enable(gl.BLEND);
