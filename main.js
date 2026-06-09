@@ -171,6 +171,39 @@ function playBumpSound() {
     osc.stop(t + 0.3);
 }
 
+var trainRumbleOsc = null;
+var trainRumbleGain = null;
+
+function updateTrainRumble(intensity) {
+    initSfx();
+    resumeSfx();
+    if (!audioCtx) return;
+    if (intensity <= 0) {
+        if (trainRumbleGain) {
+            try { trainRumbleGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1); } catch(e) {}
+        }
+        return;
+    }
+    if (!trainRumbleOsc) {
+        trainRumbleOsc = audioCtx.createOscillator();
+        trainRumbleGain = audioCtx.createGain();
+        trainRumbleOsc.type = 'sawtooth';
+        trainRumbleOsc.frequency.value = 45;
+        // Lowpass filter for rumble
+        var filter = audioCtx.createBiquadFilter();
+        filter.type = 'lowpass';
+        filter.frequency.value = 120;
+        trainRumbleOsc.connect(filter);
+        filter.connect(trainRumbleGain);
+        trainRumbleGain.connect(sfxMasterGain);
+        trainRumbleOsc.start();
+    }
+    var t = audioCtx.currentTime;
+    var vol = Math.min(0.25, intensity * 0.15);
+    trainRumbleGain.gain.setTargetAtTime(vol, t, 0.05);
+    trainRumbleOsc.frequency.setTargetAtTime(40 + intensity * 15, t, 0.05);
+}
+
 function applyTheme(t) {
   track_texture = themeTextures[t].track;
   wall_texture = themeTextures[t].wall;
@@ -933,10 +966,17 @@ function main() {
       }
     }
 
+    // Train proximity rumble intensity
+    var rumbleIntensity = 0;
+
     if (!player.hoverboard) {
       // collision with train
       for (var i = 0; i < num_trains; i++) {
         if (player.pos[0] == trainF[i].pos[0]) {
+          var zdistTrain = player.pos[2] - trainF[i].pos[2];
+          if (zdistTrain > -25 && zdistTrain < 5) {
+            rumbleIntensity = Math.max(rumbleIntensity, 1.0 - Math.abs(zdistTrain + 5) / 20);
+          }
           if (player.pos[1] >= trainF[i].pos[1] - 4 && player.pos[1] <= trainF[i].pos[1] + 4) {
             if (player.pos[2] >= trainF[i].pos[2] - 18 && player.pos[2] <= trainF[i].pos[2]) {
               if (dying) break;
@@ -957,7 +997,6 @@ function main() {
             }
           }
           // Near miss: same track, very close z, but player is above the train
-          var zdistTrain = player.pos[2] - trainF[i].pos[2];
           if (zdistTrain > -18 && zdistTrain < -15 && player.pos[1] > trainT[i].pos[1] + 2) {
             var now = Date.now() * 0.001;
             if (now - nearMissTimer > 1.0) {
@@ -976,6 +1015,9 @@ function main() {
           }
         }
       }
+
+      // Update train rumble audio
+      if (typeof updateTrainRumble === 'function') updateTrainRumble(rumbleIntensity);
 
       // collision with boxes
       var num_boxes = boxes.length;
