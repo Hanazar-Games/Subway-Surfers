@@ -1306,6 +1306,16 @@ function main() {
 
     if (player.pos[2] <= -800) {
       score = -player.pos[2] + coins_collected;
+      // Victory celebration
+      if (typeof flashScreen === 'function') flashScreen('#ffd700', 0.5);
+      for (var p = 0; p < 40; p++) {
+        var angle = Math.random() * Math.PI * 2;
+        var speed = 3.0 + Math.random() * 5.0;
+        particles.push(new Particle(gl,
+          [player.pos[0], player.pos[1] + 2, player.pos[2]],
+          [Math.cos(angle)*speed, Math.random()*6.0 + 2.0, Math.sin(angle)*speed],
+          1.0 + Math.random()*0.5, glow_gold_texture));
+      }
       if (typeof uiGameOver === 'function') { uiGameOver(true, score, coins_collected); return; }
     }
 
