@@ -78,6 +78,8 @@ var sparkTimer = 0;
 var lastMilestone = 0;
 var nearMissTimer = 0;
 var envParticles = []; // ambient floating dust
+var dying = false;
+var deathTimer = 0;
 
 var cubeRotation = 0;
 
@@ -641,6 +643,19 @@ function main() {
       player.speedz = player_speed;
     }
 
+    // Death slow-motion: gradually freeze time then end game
+    if (dying) {
+      deathTimer += deltaTime;
+      player.speedz *= 0.85;
+      cameraShake *= 0.9;
+      if (deathTimer > 0.6) {
+        dying = false;
+        deathTimer = 0;
+        if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); }
+        return;
+      }
+    }
+
     if (player.jumping_boots) {
       if (d.getTime() * 0.001 - boots_acquired >= 10) {
         player.jumping_boots = false;
@@ -905,8 +920,9 @@ function main() {
         if (player.pos[0] == trainF[i].pos[0]) {
           if (player.pos[1] >= trainF[i].pos[1] - 4 && player.pos[1] <= trainF[i].pos[1] + 4) {
             if (player.pos[2] >= trainF[i].pos[2] - 18 && player.pos[2] <= trainF[i].pos[2]) {
+              if (dying) break;
               score = -player.pos[2] + coins_collected;
-              cameraShake = 0.6;
+              cameraShake = 0.8;
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
               for (var p = 0; p < 20; p++) {
@@ -916,7 +932,9 @@ function main() {
                 particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
               }
               Die();
-              if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
+              dying = true;
+              deathTimer = 0;
+              break;
             }
           }
           // Near miss: same track, very close z, but player is above the train
@@ -945,8 +963,9 @@ function main() {
         if (player.pos[0] == boxes[i].pos[0]) {
           if (player.pos[1] >= boxes[i].pos[1] - 2 && player.pos[1] <= boxes[i].pos[1] + 2) {
             if (player.pos[2] <= boxes[i].pos[2] + 3 && player.pos[2] >= boxes[i].pos[2] - 3) {
+              if (dying) break;
               score = -player.pos[2] + coins_collected;
-              cameraShake = 0.6;
+              cameraShake = 0.8;
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
               for (var p = 0; p < 20; p++) {
@@ -956,7 +975,9 @@ function main() {
                 particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
               }
               Die();
-              if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
+              dying = true;
+              deathTimer = 0;
+              break;
             }
           }
         }
@@ -968,8 +989,9 @@ function main() {
         if (player.pos[0] == manholes[i].pos[0]) {
           if (player.pos[1] <= -4) {
             if (player.pos[2] <= manholes[i].pos[2] + 2.3 && player.pos[2] >= manholes[i].pos[2] - 2.3) {
+              if (dying) break;
               score = -player.pos[2] + coins_collected;
-              cameraShake = 0.6;
+              cameraShake = 0.8;
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
               for (var p = 0; p < 20; p++) {
@@ -979,7 +1001,9 @@ function main() {
                 particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
               }
               Die();
-              if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
+              dying = true;
+              deathTimer = 0;
+              break;
             }
           }
         }
