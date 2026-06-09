@@ -499,11 +499,21 @@ var gamePaused = false;
     if (bestV) {
       bestV.textContent = formatNum(getHighScore()) + (isNewBest ? ' ★' : '');
     }
-    if (isNewBest && typeof showComboText === 'function') {
-      setTimeout(function() {
-        var rect = document.getElementById('glcanvas').getBoundingClientRect();
-        showComboText('NEW RECORD!', rect.left + rect.width / 2, rect.top + rect.height * 0.25);
-      }, 300);
+    if (isNewBest) {
+      if (title) {
+        title.textContent = 'NEW RECORD!';
+        title.style.color = 'var(--neon-gold)';
+        title.style.textShadow = '0 0 30px rgba(255,215,0,0.5)';
+      }
+      if (typeof showComboText === 'function') {
+        setTimeout(function() {
+          var rect = document.getElementById('glcanvas').getBoundingClientRect();
+          showComboText('NEW RECORD!', rect.left + rect.width / 2, rect.top + rect.height * 0.25);
+        }, 300);
+      }
+      if (typeof flashScreen === 'function') {
+        setTimeout(function() { flashScreen('rgba(255,215,0,0.2)', 0.4); }, 200);
+      }
     }
     // Show achievement unlock toast
     newAchievements.forEach(function (a, i) {
