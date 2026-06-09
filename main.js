@@ -1018,6 +1018,11 @@ function main() {
                 var screenY = rect.top + rect.height * 0.4;
                 showComboText('x' + scoreMultiplier + '!', screenX, screenY);
                 if (typeof flashScreen === 'function') flashScreen('#05d9e8', 0.25);
+              } else if (multiplierStreak > 1 && multiplierStreak % 5 === 0 && typeof showComboText === 'function') {
+                var rect = document.getElementById('glcanvas').getBoundingClientRect();
+                var screenX = rect.left + rect.width / 2 + (player.pos[0] / 6) * rect.width * 0.3;
+                var screenY = rect.top + rect.height * 0.4;
+                showComboText(multiplierStreak + ' combo!', screenX, screenY);
               }
               coins_collected += scoreMultiplier;
               playCoinSound();
