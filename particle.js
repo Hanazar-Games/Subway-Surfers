@@ -1,3 +1,4 @@
+"use strict";
 /// <reference path="webgl.d.ts" />
 
 // Simple billboard particle (small golden square)

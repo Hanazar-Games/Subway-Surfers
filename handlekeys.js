@@ -1,3 +1,4 @@
+"use strict";
 // 游戏初始化完成标志，由 main.js 设置
 var gameReady = false;
 

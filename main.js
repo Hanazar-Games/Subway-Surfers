@@ -1,3 +1,5 @@
+"use strict";
+
 var player;
 var police;
 var dog;
@@ -32,6 +34,7 @@ var wall_texture;
 var city_texture;
 var coin_texture;
 var trainF_texture, trainT_texture, trainL_texture, trainR_texture;
+var train_texture;
 var box_texture;
 var manhole_texture;
 var stop_texture, stand_texture;
@@ -40,6 +43,9 @@ var fb_texture;
 var hoverboard_texture;
 var particle_texture;
 var dust_texture;
+
+// Theme texture caches (preload both themes to avoid runtime reloads)
+var themeTextures = {1: {}, 2: {}};
 
 var cam_x = 0, cam_y = 5, cam_z = 13.0;
 var cameraShake = 0;
@@ -62,6 +68,11 @@ var player_speed = 0.5;
 
 var score = 0;
 var coins_collected = 0;
+var scoreMultiplier = 1;
+var multiplierStreak = 0;
+var lastCoinTime = 0;
+var trailTimer = 0;
+var sparkTimer = 0;
 
 var cubeRotation = 0;
 
@@ -149,6 +160,24 @@ function playBumpSound() {
     osc.stop(t + 0.3);
 }
 
+function applyTheme(t) {
+  track_texture = themeTextures[t].track;
+  wall_texture = themeTextures[t].wall;
+  city_texture = themeTextures[t].city;
+  player_texture = themeTextures[t].player;
+  police_texture = themeTextures[t].police;
+  coin_texture = themeTextures[t].coin;
+  train_texture = themeTextures[t].train;
+  box_texture = themeTextures[t].box;
+  manhole_texture = themeTextures[t].manhole;
+  stop_texture = themeTextures[t].stop;
+  stand_texture = themeTextures[t].stand;
+  boots_texture = themeTextures[t].boots;
+  fb_texture = themeTextures[t].fb;
+  hoverboard_texture = themeTextures[t].hoverboard;
+  dog_texture = themeTextures[t].dog;
+}
+
 main();
 
 function main() {
@@ -183,13 +212,13 @@ function main() {
 
   varying highp vec2 vTextureCoord;
   varying highp vec3 vLighting;
+  varying highp float vFogDepth;
 
   void main(void) {
     gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
     vTextureCoord = aTextureCoord;
 
     // Apply lighting effect
-
     highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
     highp vec3 directionalLightColor = vec3(1, 1, 1);
     highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
@@ -198,6 +227,9 @@ function main() {
 
     highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
     vLighting = ambientLight + (directionalLightColor * directional);
+
+    // Fog depth = distance from camera in view space
+    vFogDepth = -(uModelViewMatrix * aVertexPosition).z;
   }
 `;
 
@@ -212,70 +244,107 @@ function main() {
 
   varying highp vec2 vTextureCoord;
   varying highp vec3 vLighting;
+  varying highp float vFogDepth;
 
   void main(void) {
-  gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
-  vTextureCoord = aTextureCoord;
+    gl_Position = uProjectionMatrix * uModelViewMatrix * aVertexPosition;
+    vTextureCoord = aTextureCoord;
 
-  // Apply lighting effect
+    // Apply lighting effect
+    highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
+    highp vec3 directionalLightColor = vec3(1, 1, 1);
+    highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
 
-  highp vec3 ambientLight = vec3(0.3, 0.3, 0.3);
-  highp vec3 directionalLightColor = vec3(1, 1, 1);
-  highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
+    highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
 
-  highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+    highp float directional = max(dot(transformedNormal.xyz, directionalVector), 1.0);
+    vLighting = ambientLight + (directionalLightColor * directional);
 
-  highp float directional = max(dot(transformedNormal.xyz, directionalVector), 1.0);
-  vLighting = ambientLight + (directionalLightColor * directional);
-}
+    vFogDepth = -(uModelViewMatrix * aVertexPosition).z;
+  }
 `;
 
   const fsSource = `
     varying highp vec2 vTextureCoord;
     varying highp vec3 vLighting;
+    varying highp float vFogDepth;
 
     uniform sampler2D uSampler;
+    uniform highp vec3 uFogColor;
+    uniform highp float uFogNear;
+    uniform highp float uFogFar;
 
     void main(void) {
       highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+      highp vec4 litColor = vec4(texelColor.rgb * vLighting, texelColor.a);
 
-      gl_FragColor = vec4(texelColor.rgb * vLighting, texelColor.a);
+      highp float fogAmount = smoothstep(uFogNear, uFogFar, vFogDepth);
+      gl_FragColor = mix(litColor, vec4(uFogColor, 1.0), fogAmount);
     }
   `;
 
   const fsSourcebw = `
-  varying highp vec2 vTextureCoord;
-  varying highp vec3 vLighting;
+    varying highp vec2 vTextureCoord;
+    varying highp vec3 vLighting;
+    varying highp float vFogDepth;
 
-  uniform sampler2D uSampler;
+    uniform sampler2D uSampler;
+    uniform highp vec3 uFogColor;
+    uniform highp float uFogNear;
+    uniform highp float uFogFar;
 
-  void main(void) {
-    highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+    void main(void) {
+      highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
+      highp vec4 litColor = vec4(texelColor.rrr * vLighting, texelColor.a);
 
-    gl_FragColor = vec4(texelColor.rrr * vLighting, texelColor.a);
-  }`;
+      highp float fogAmount = smoothstep(uFogNear, uFogFar, vFogDepth);
+      gl_FragColor = mix(litColor, vec4(uFogColor, 1.0), fogAmount);
+    }
+  `;
 
   const shaderProgram = initShaderProgram(gl, vsSource, fsSource);
   const shaderProgrambw = initShaderProgram(gl, vsSource, fsSourcebw);
   const shaderProgramhigh = initShaderProgram(gl, vsSourcehigh, fsSource);
 
-  track_texture = loadTexture(gl, 'assets/1_Track.jpg');
-  wall_texture = loadTexture(gl, 'assets/1_Wall.jpg');
-  city_texture = loadTexture(gl, 'assets/1_City.jpg');
-  player_texture = loadTexture(gl, 'assets/1_Player.jpeg');
-  police_texture = loadTexture(gl, 'assets/1_Police.png');
-  coin_texture = loadTexture(gl, 'assets/1_Coin.jpg');
-  train_texture = loadTexture(gl, 'assets/1_Train.jpeg');
-  box_texture = loadTexture(gl, 'assets/1_Box.png');
-  manhole_texture = loadTexture(gl, 'assets/1_Manhole.jpeg');
-  stop_texture = loadTexture(gl, 'assets/1_Stop.jpg');
-  stand_texture = loadTexture(gl, 'assets/1_Stand.jpeg');
-  boots_texture = loadTexture(gl, 'assets/1_Boots.jpeg');
-  fb_texture = loadTexture(gl, 'assets/1_FlyingBoost.jpeg');
-  hoverboard_texture = loadTexture(gl, 'assets/1_Hoverboard.jpeg');
-  dog_texture = loadTexture(gl, 'assets/1_Dog.jpeg');
+  // Preload ALL theme textures once at startup
+  themeTextures[1] = {
+    track: loadTexture(gl, 'assets/1_Track.jpg'),
+    wall: loadTexture(gl, 'assets/1_Wall.jpg'),
+    city: loadTexture(gl, 'assets/1_City.jpg'),
+    player: loadTexture(gl, 'assets/1_Player.jpeg'),
+    police: loadTexture(gl, 'assets/1_Police.png'),
+    coin: loadTexture(gl, 'assets/1_Coin.jpg'),
+    train: loadTexture(gl, 'assets/1_Train.jpeg'),
+    box: loadTexture(gl, 'assets/1_Box.png'),
+    manhole: loadTexture(gl, 'assets/1_Manhole.jpeg'),
+    stop: loadTexture(gl, 'assets/1_Stop.jpg'),
+    stand: loadTexture(gl, 'assets/1_Stand.jpeg'),
+    boots: loadTexture(gl, 'assets/1_Boots.jpeg'),
+    fb: loadTexture(gl, 'assets/1_FlyingBoost.jpeg'),
+    hoverboard: loadTexture(gl, 'assets/1_Hoverboard.jpeg'),
+    dog: loadTexture(gl, 'assets/1_Dog.jpeg'),
+  };
+  themeTextures[2] = {
+    track: loadTexture(gl, 'assets/2_Track.jpeg'),
+    wall: loadTexture(gl, 'assets/2_Wall.jpeg'),
+    city: loadTexture(gl, 'assets/2_City.jpg'),
+    player: loadTexture(gl, 'assets/2_Player.jpeg'),
+    police: loadTexture(gl, 'assets/2_Police.jpeg'),
+    coin: loadTexture(gl, 'assets/2_Coin.jpeg'),
+    train: loadTexture(gl, 'assets/2_Train.jpg'),
+    box: loadTexture(gl, 'assets/2_Box.jpg'),
+    manhole: loadTexture(gl, 'assets/2_Manhole.jpeg'),
+    stop: loadTexture(gl, 'assets/2_Stop.jpeg'),
+    stand: loadTexture(gl, 'assets/2_Stand.jpg'),
+    boots: loadTexture(gl, 'assets/2_Boots.jpg'),
+    fb: loadTexture(gl, 'assets/2_FlyingBoost.jpg'),
+    hoverboard: loadTexture(gl, 'assets/2_Hoverboard.jpg'),
+    dog: loadTexture(gl, 'assets/1_Dog.jpeg'),
+  };
   particle_texture = loadTexture(gl, 'assets/1_Coin.jpg');
   dust_texture = loadTexture(gl, 'assets/1_Dust.png');
+
+  applyTheme(1);
 
   const programInfo = {
     program: shaderProgram,
@@ -289,6 +358,9 @@ function main() {
       modelViewMatrix: gl.getUniformLocation(shaderProgram, 'uModelViewMatrix'),
       normalMatrix: gl.getUniformLocation(shaderProgram, 'uNormalMatrix'),
       uSampler: gl.getUniformLocation(shaderProgram, 'uSampler'),
+      uFogColor: gl.getUniformLocation(shaderProgram, 'uFogColor'),
+      uFogNear: gl.getUniformLocation(shaderProgram, 'uFogNear'),
+      uFogFar: gl.getUniformLocation(shaderProgram, 'uFogFar'),
     },
   };
 
@@ -304,6 +376,9 @@ function main() {
       modelViewMatrix: gl.getUniformLocation(shaderProgrambw, 'uModelViewMatrix'),
       normalMatrix: gl.getUniformLocation(shaderProgrambw, 'uNormalMatrix'),
       uSampler: gl.getUniformLocation(shaderProgrambw, 'uSampler'),
+      uFogColor: gl.getUniformLocation(shaderProgrambw, 'uFogColor'),
+      uFogNear: gl.getUniformLocation(shaderProgrambw, 'uFogNear'),
+      uFogFar: gl.getUniformLocation(shaderProgrambw, 'uFogFar'),
     },
   };
 
@@ -319,6 +394,9 @@ function main() {
       modelViewMatrix: gl.getUniformLocation(shaderProgramhigh, 'uModelViewMatrix'),
       normalMatrix: gl.getUniformLocation(shaderProgramhigh, 'uNormalMatrix'),
       uSampler: gl.getUniformLocation(shaderProgramhigh, 'uSampler'),
+      uFogColor: gl.getUniformLocation(shaderProgramhigh, 'uFogColor'),
+      uFogNear: gl.getUniformLocation(shaderProgramhigh, 'uFogNear'),
+      uFogFar: gl.getUniformLocation(shaderProgramhigh, 'uFogFar'),
     },
   };
 
@@ -694,7 +772,17 @@ function main() {
           if (coins[i].pos[1] >= player.pos[1] - 0.75 && coins[i].pos[1] <= player.pos[1] + 0.75) {
             if (coins[i].pos[2] >= player.pos[2] - 0.5 && coins[i].pos[2] <= player.pos[2] + 0.5) {
               coins[i].exist = false;
-              coins_collected += 1;
+              var now = Date.now() * 0.001;
+              if (now - lastCoinTime < 2.0) {
+                multiplierStreak += 1;
+              } else {
+                multiplierStreak = 1;
+              }
+              lastCoinTime = now;
+              if (multiplierStreak >= 20) scoreMultiplier = 3;
+              else if (multiplierStreak >= 10) scoreMultiplier = 2;
+              else scoreMultiplier = 1;
+              coins_collected += scoreMultiplier;
               playCoinSound();
               // Spawn sparkle particles on coin collect
               for (var p = 0; p < 6; p++) {
@@ -952,6 +1040,59 @@ function main() {
       if (typeof uiGameOver === 'function') { uiGameOver(true, score, coins_collected); return; }
     }
 
+    // Decay score multiplier if no coin collected recently
+    var nowTime = Date.now() * 0.001;
+    if (nowTime - lastCoinTime >= 2.0 && scoreMultiplier > 1) {
+      scoreMultiplier = 1;
+      multiplierStreak = 0;
+    }
+
+    // Trail particles for hoverboard / flying boost
+    trailTimer += deltaTime;
+    if (trailTimer > 0.05) {
+      trailTimer = 0;
+      if (player.hoverboard) {
+        for (var p = 0; p < 2; p++) {
+          var tx = player.pos[0] + (Math.random() - 0.5) * 0.6;
+          var ty = player.pos[1] - 0.8;
+          var tz = player.pos[2] + 1.5 + Math.random() * 0.5;
+          particles.push(new Particle(gl, [tx, ty, tz], [(Math.random()-0.5)*1.0, 0.5, 2.0], 0.3 + Math.random()*0.2, dust_texture));
+        }
+      }
+      if (player.fly_boost) {
+        for (var p = 0; p < 3; p++) {
+          var tx = player.pos[0] + (Math.random() - 0.5) * 0.4;
+          var ty = player.pos[1] - 1.5;
+          var tz = player.pos[2] + 1.0 + Math.random() * 0.5;
+          particles.push(new Particle(gl, [tx, ty, tz], [(Math.random()-0.5)*0.5, -1.0 - Math.random(), 1.5], 0.25 + Math.random()*0.15, dust_texture));
+        }
+      }
+    }
+
+    // Train spark particles when train is close behind
+    sparkTimer += deltaTime;
+    if (sparkTimer > 0.08) {
+      sparkTimer = 0;
+      var num_trains = trainF.length;
+      for (var i = 0; i < num_trains; i++) {
+        if (trainF[i].pos[0] == player.pos[0]) {
+          var zdist = player.pos[2] - trainF[i].pos[2];
+          if (zdist > -15 && zdist < 5) {
+            // Sparks from train wheels
+            for (var p = 0; p < 2; p++) {
+              var sx = trainF[i].pos[0] + (Math.random() - 0.5) * 2.5;
+              var sy = trainF[i].pos[1] - 4.5;
+              var sz = trainF[i].pos[2] + (Math.random() - 0.5) * 8;
+              var svx = (Math.random() - 0.5) * 4.0;
+              var svy = Math.random() * 3.0 + 1.0;
+              var svz = (Math.random() - 0.5) * 4.0;
+              particles.push(new Particle(gl, [sx, sy, sz], [svx, svy, svz], 0.3 + Math.random() * 0.2, particle_texture));
+            }
+          }
+        }
+      }
+    }
+
     // update particles
     for (var i = particles.length - 1; i >= 0; i--) {
       particles[i].update(deltaTime);
@@ -1002,64 +1143,31 @@ function main() {
 function drawScene(gl, programInfo, deltaTime) {
 
   if (theme_flag == 1) {
+    applyTheme(theme);
     if (theme == 1) {
-      track_texture = loadTexture(gl, 'assets/1_Track.jpg');
-      wall_texture = loadTexture(gl, 'assets/1_Wall.jpg');
-      city_texture = loadTexture(gl, 'assets/1_City.jpg');
-      player_texture = loadTexture(gl, 'assets/1_Player.jpeg');
-      police_texture = loadTexture(gl, 'assets/1_Police.png');
-      coin_texture = loadTexture(gl, 'assets/1_Coin.jpg');
-      train_texture = loadTexture(gl, 'assets/1_Train.jpeg');
-      box_texture = loadTexture(gl, 'assets/1_Box.png');
-      manhole_texture = loadTexture(gl, 'assets/1_Manhole.jpeg');
-      stop_texture = loadTexture(gl, 'assets/1_Stop.jpg');
-      stand_texture = loadTexture(gl, 'assets/1_Stand.jpeg');
-      boots_texture = loadTexture(gl, 'assets/1_Boots.jpeg');
-      fb_texture = loadTexture(gl, 'assets/1_FlyingBoost.jpeg');
-      hoverboard_texture = loadTexture(gl, 'assets/1_Hoverboard.jpeg');
-      dog_texture = loadTexture(gl, 'assets/1_Dog.jpeg');
       gl.clearColor(144 / 256, 228 / 256, 252 / 256, 1.0);
       if (greyScale)
-        gl.clearColor(50 / 255, 50 / 255, 50 / 255, 1.0); 
+        gl.clearColor(50 / 255, 50 / 255, 50 / 255, 1.0);
     }
     if (theme == 2) {
-      track_texture = loadTexture(gl, 'assets/2_Track.jpeg');
-      wall_texture = loadTexture(gl, 'assets/2_Wall.jpeg');
-      city_texture = loadTexture(gl, 'assets/2_City.jpg');
-      player_texture = loadTexture(gl, 'assets/2_Player.jpeg');
-      police_texture = loadTexture(gl, 'assets/2_Police.jpeg');
-      coin_texture = loadTexture(gl, 'assets/2_Coin.jpeg');
-      train_texture = loadTexture(gl, 'assets/2_Train.jpg');
-      box_texture = loadTexture(gl, 'assets/2_Box.jpg');
-      manhole_texture = loadTexture(gl, 'assets/2_Manhole.jpeg');
-      stop_texture = loadTexture(gl, 'assets/2_Stop.jpeg');
-      stand_texture = loadTexture(gl, 'assets/2_Stand.jpg');
-      boots_texture = loadTexture(gl, 'assets/2_Boots.jpg');
-      fb_texture = loadTexture(gl, 'assets/2_FlyingBoost.jpg');
-      hoverboard_texture = loadTexture(gl, 'assets/2_Hoverboard.jpg');
-      dog_texture = loadTexture(gl, 'assets/1_Dog.jpeg');
       gl.clearColor(0, 0, 0, 1.0);
     }
     theme_flag = 0;
   }
 
-  gl.clearDepth(1.0);                 // Clear everything
-  gl.enable(gl.DEPTH_TEST);           // Enable depth testing
-  gl.depthFunc(gl.LEQUAL);            // Near things obscure far things
+  gl.clearDepth(1.0);
+  gl.enable(gl.DEPTH_TEST);
+  gl.depthFunc(gl.LEQUAL);
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  const fieldOfView = 45 * Math.PI / 180;   // in radians
+  const fieldOfView = 45 * Math.PI / 180;
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
   const zNear = 0.1;
   const zFar = 100.0;
   const projectionMatrix = mat4.create();
 
-  mat4.perspective(projectionMatrix,
-    fieldOfView,
-    aspect,
-    zNear,
-    zFar);
+  mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
 
   var cameraMatrix = mat4.create();
   mat4.translate(cameraMatrix, cameraMatrix, [cam_x, cam_y, cam_z]);
@@ -1072,11 +1180,19 @@ function drawScene(gl, programInfo, deltaTime) {
 
   mat4.lookAt(cameraMatrix, cameraPosition, [target_x, target_y, cam_z - 10], up);
 
-  var viewMatrix = cameraMatrix;//mat4.create();
+  var viewMatrix = cameraMatrix;
 
   var viewProjectionMatrix = mat4.create();
 
   mat4.multiply(viewProjectionMatrix, projectionMatrix, viewMatrix);
+
+  // Set fog uniforms (theme-dependent fog color)
+  var fogColor = theme == 1 ? [0.56, 0.89, 0.99] : [0.0, 0.0, 0.0];
+  if (greyScale) fogColor = [0.2, 0.2, 0.2];
+  gl.useProgram(programInfo.program);
+  gl.uniform3fv(programInfo.uniformLocations.uFogColor, fogColor);
+  gl.uniform1f(programInfo.uniformLocations.uFogNear, 25.0);
+  gl.uniform1f(programInfo.uniformLocations.uFogFar, 90.0);
 
   for (var i = 0; i < 1000; i += 1) {
     track1[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);

@@ -259,10 +259,12 @@ var gamePaused = false;
   // ===== HUD updater =====
   function startHUDUpdate() {
     stopHUDUpdate();
-    var lastScore = -1, lastCoins = -1, lastTheme = -1;
+    var lastScore = -1, lastCoins = -1, lastTheme = -1, lastMult = -1;
     var scoreEl = $('#hud-score');
     var coinEl = $('#hud-coins');
     var timeEl = $('#hud-time');
+    var multEl = $('#hud-multiplier');
+    var multPanel = $('#hud-multiplier-panel');
     var pBoots = $('#power-boots');
     var pFly = $('#power-fly');
     var pHover = $('#power-hover');
@@ -298,6 +300,13 @@ var gamePaused = false;
         var m = Math.floor(elapsed / 60);
         var s = elapsed % 60;
         timeEl.textContent = m + ':' + (s < 10 ? '0' : '') + s;
+      }
+      // Multiplier
+      if (typeof scoreMultiplier !== 'undefined' && scoreMultiplier !== lastMult) {
+        lastMult = scoreMultiplier;
+        if (multEl) multEl.textContent = 'x' + scoreMultiplier;
+        if (multPanel) multPanel.style.display = scoreMultiplier > 1 ? 'flex' : 'none';
+        if (scoreMultiplier > 1 && multEl) popScore(multEl);
       }
       // Theme
       if (typeof theme !== 'undefined' && theme !== lastTheme) {
