@@ -2,132 +2,120 @@
 
 let Manhole = class {
     constructor(gl, pos, h, w, b) {
-        this.positionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-
-        this.positions = [
-            // Front face
-            -w / 2, -h / 2, b / 2,
-            w / 2, -h / 2, b / 2,
-            w / 2, h / 2, b / 2,
-            -w / 2, h / 2, b / 2,
-            //Back Face
-            -w / 2, -h / 2, -b / 2,
-            w / 2, -h / 2, -b / 2,
-            w / 2, h / 2, -b / 2,
-            -w / 2, h / 2, -b / 2,
-            //Top Face
-            -w / 2, h / 2, -b / 2,
-            w / 2, h / 2, -b / 2,
-            w / 2, h / 2, b / 2,
-            -w / 2, h / 2, b / 2,
-            //Bottom Face
-            -w / 2, -h / 2, -b / 2,
-            w / 2, -h / 2, -b / 2,
-            w / 2, -h / 2, b / 2,
-            -w / 2, -h / 2, b / 2,
-            //Left Face
-            -w / 2, -h / 2, -b / 2,
-            -w / 2, h / 2, -b / 2,
-            -w / 2, h / 2, b / 2,
-            -w / 2, -h / 2, b / 2,
-            //Right Face
-            w / 2, -h / 2, -b / 2,
-            w / 2, h / 2, -b / 2,
-            w / 2, h / 2, b / 2,
-            w / 2, -h / 2, b / 2,
-        ];
-
         this.rotation = 0.0;
         this.pos = pos;
         this.exist = true;
 
-        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
+        // Create a flat cylindrical disc (12-sided polygon) for manhole cover
+        // Radius from width, half-height from h
+        var radius = w / 2;
+        var halfH = h / 2;
+        var segments = 12;
+        var positions = [];
+        var textureCoordinates = [];
+        var vertexNormals = [];
+        var indices = [];
+
+        // === TOP FACE ===
+        // Center vertex
+        positions.push(0, halfH, 0);
+        textureCoordinates.push(0.5, 0.5);
+        vertexNormals.push(0, 1, 0);
+
+        // Top edge vertices
+        for (var i = 0; i < segments; i++) {
+            var angle = (i / segments) * Math.PI * 2;
+            var x = Math.cos(angle) * radius;
+            var z = Math.sin(angle) * radius;
+            positions.push(x, halfH, z);
+            textureCoordinates.push(0.5 + Math.cos(angle) * 0.5, 0.5 + Math.sin(angle) * 0.5);
+            vertexNormals.push(0, 1, 0);
+        }
+
+        // Top face indices (center at 0, edge at 1..segments)
+        // Order (center, next, current) gives normal pointing up (+Y)
+        for (var i = 0; i < segments; i++) {
+            var next = (i + 1) % segments;
+            indices.push(0, next + 1, i + 1);
+        }
+
+        // === BOTTOM FACE ===
+        var bottomCenterIdx = positions.length / 3;
+        positions.push(0, -halfH, 0);
+        textureCoordinates.push(0.5, 0.5);
+        vertexNormals.push(0, -1, 0);
+
+        // Bottom edge vertices
+        for (var i = 0; i < segments; i++) {
+            var angle = (i / segments) * Math.PI * 2;
+            var x = Math.cos(angle) * radius;
+            var z = Math.sin(angle) * radius;
+            positions.push(x, -halfH, z);
+            textureCoordinates.push(0.5 + Math.cos(angle) * 0.5, 0.5 + Math.sin(angle) * 0.5);
+            vertexNormals.push(0, -1, 0);
+        }
+
+        // Bottom face indices
+        // Order (center, current, next) gives normal pointing down (-Y)
+        for (var i = 0; i < segments; i++) {
+            var next = (i + 1) % segments;
+            indices.push(bottomCenterIdx, bottomCenterIdx + i + 1, bottomCenterIdx + next + 1);
+        }
+
+        // === SIDE FACES ===
+        // Each side is a rectangle between two edge vertices (top and bottom)
+        for (var i = 0; i < segments; i++) {
+            var next = (i + 1) % segments;
+            var topCurrent = 1 + i;
+            var topNext = 1 + next;
+            var bottomCurrent = bottomCenterIdx + 1 + i;
+            var bottomNext = bottomCenterIdx + 1 + next;
+
+            // Normal for this side segment
+            var angle = (i + 0.5) / segments * Math.PI * 2;
+            var nx = Math.cos(angle);
+            var nz = Math.sin(angle);
+
+            // 4 vertices for the side quad
+            var sideBaseIdx = positions.length / 3;
+
+            positions.push(positions[topCurrent * 3], positions[topCurrent * 3 + 1], positions[topCurrent * 3 + 2]);
+            textureCoordinates.push(i / segments, 1.0);
+            vertexNormals.push(nx, 0, nz);
+
+            positions.push(positions[topNext * 3], positions[topNext * 3 + 1], positions[topNext * 3 + 2]);
+            textureCoordinates.push((i + 1) / segments, 1.0);
+            vertexNormals.push(nx, 0, nz);
+
+            positions.push(positions[bottomNext * 3], positions[bottomNext * 3 + 1], positions[bottomNext * 3 + 2]);
+            textureCoordinates.push((i + 1) / segments, 0.0);
+            vertexNormals.push(nx, 0, nz);
+
+            positions.push(positions[bottomCurrent * 3], positions[bottomCurrent * 3 + 1], positions[bottomCurrent * 3 + 2]);
+            textureCoordinates.push(i / segments, 0.0);
+            vertexNormals.push(nx, 0, nz);
+
+            indices.push(sideBaseIdx, sideBaseIdx + 1, sideBaseIdx + 2);
+            indices.push(sideBaseIdx, sideBaseIdx + 2, sideBaseIdx + 3);
+        }
+
+        this.vertexCount = indices.length;
+
+        // Create buffers
+        this.positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(positions), gl.STATIC_DRAW);
 
         const indexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
-        const indices = [
-            0, 1, 2, 0, 2, 3, // front
-            4, 5, 6, 4, 6, 7,
-            8, 9, 10, 8, 10, 11,
-            12, 13, 14, 12, 14, 15,
-            16, 17, 18, 16, 18, 19,
-            20, 21, 22, 20, 22, 23,
-        ];
-
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
         const textureCoordBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
-        const textureCoordinates = [
-            // Front
-            0.0, 1.0,
-            1.0, 1.0,
-            1.0, 0.0,
-            0.0, 0.0,
-            // Back
-            1.0, 1.0,
-            1.0, 0.0,
-            0.0, 0.0,
-            0.0, 1.0,
-            // Top
-            0.0, 1.0,
-            1.0, 1.0,
-            1.0, 0.0,
-            0.0, 0.0,
-            // Bottom
-            0.0, 1.0,
-            1.0, 1.0,
-            1.0, 0.0,
-            0.0, 0.0,
-            // Right
-            1.0, 1.0,
-            1.0, 0.0,
-            0.0, 0.0,
-            0.0, 1.0,
-            // Left
-            0.0, 1.0,
-            1.0, 1.0,
-            1.0, 0.0,
-            0.0, 0.0,
-        ];
-
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
 
         const normalBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
-        const vertexNormals = [
-            // Front
-            0.0, 0.0, 1.0,
-            0.0, 0.0, 1.0,
-            0.0, 0.0, 1.0,
-            0.0, 0.0, 1.0,
-            // Back
-            0.0, 0.0, -1.0,
-            0.0, 0.0, -1.0,
-            0.0, 0.0, -1.0,
-            0.0, 0.0, -1.0,
-            // Top
-            0.0, 1.0, 0.0,
-            0.0, 1.0, 0.0,
-            0.0, 1.0, 0.0,
-            0.0, 1.0, 0.0,
-            // Bottom
-            0.0, -1.0, 0.0,
-            0.0, -1.0, 0.0,
-            0.0, -1.0, 0.0,
-            0.0, -1.0, 0.0,
-            // Right
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            // Left
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0
-        ];
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals), gl.STATIC_DRAW);
 
         this.buffer = {
@@ -231,10 +219,9 @@ let Manhole = class {
         gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
 
         {
-            const vertexCount = 36;
             const type = gl.UNSIGNED_SHORT;
             const offset = 0;
-            gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
+            gl.drawElements(gl.TRIANGLES, this.vertexCount, type, offset);
         }
 
     }

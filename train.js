@@ -39,6 +39,8 @@ let Train = class {
         ];
 
         this.rotation = 0.0;
+        // Custom rotation axis - default is Y axis [0,1,0], wheels use X axis [1,0,0]
+        this.rotAxis = [0, 1, 0];
         this.pos = pos;
 
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
@@ -122,10 +124,10 @@ let Train = class {
             1.0, 0.0, 0.0,
             1.0, 0.0, 0.0,
             // Left
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0
+            -1.0, 0.0, 0.0,
+            -1.0, 0.0, 0.0,
+            -1.0, 0.0, 0.0,
+            -1.0, 0.0, 0.0
         ];
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals), gl.STATIC_DRAW);
 
@@ -148,7 +150,7 @@ let Train = class {
         mat4.rotate(modelViewMatrix,
             modelViewMatrix,
             this.rotation,
-            [0, 1, 0]);
+            this.rotAxis);
 
         const normalMatrix = mat4.create();
         mat4.invert(normalMatrix, modelViewMatrix);

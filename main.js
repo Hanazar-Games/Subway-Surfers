@@ -11,6 +11,7 @@ var trainT = new Array();
 var trainF = new Array();
 var trainL = new Array();
 var trainR = new Array();
+var trainExtra = new Array(); // bottom, back, wheels
 var boxes = new Array();
 var manholes = new Array();
 var duck_obs_stop = new Array();
@@ -280,10 +281,29 @@ function main() {
       x = 6;
     y = -4;
     z = - (i + 1) * 79;
+    // Train body: front, top, left, right, bottom, back panels
     trainF.push(new Train(gl, [x, y, z + 10], 10, 3, 0.1));
     trainT.push(new Train(gl, [x, y + 5, z], 0.1, 3, 20));
     trainL.push(new Train(gl, [x - 1.5, y, z], 10, 0.1, 20));
     trainR.push(new Train(gl, [x + 1.5, y, z], 10, 0.1, 20));
+    // Bottom panel
+    trainExtra.push(new Train(gl, [x, y - 5, z], 0.1, 3, 20));
+    // Back panel
+    trainExtra.push(new Train(gl, [x, y, z - 10], 10, 3, 0.1));
+    // 4 wheels with X-axis rotation for rolling effect
+    var ws = 0.8;
+    var w1 = new Train(gl, [x - 1.2, y - 5.4, z + 7], ws, ws, ws);
+    w1.rotAxis = [1, 0, 0];
+    var w2 = new Train(gl, [x + 1.2, y - 5.4, z + 7], ws, ws, ws);
+    w2.rotAxis = [1, 0, 0];
+    var w3 = new Train(gl, [x - 1.2, y - 5.4, z - 7], ws, ws, ws);
+    w3.rotAxis = [1, 0, 0];
+    var w4 = new Train(gl, [x + 1.2, y - 5.4, z - 7], ws, ws, ws);
+    w4.rotAxis = [1, 0, 0];
+    trainExtra.push(w1);
+    trainExtra.push(w2);
+    trainExtra.push(w3);
+    trainExtra.push(w4);
 
     var train_speed;
     var j = Math.floor(Math.random() * 3);
@@ -307,7 +327,8 @@ function main() {
       x = 6;
     y = -3.4;
     z = - i * 73 - 40;
-    boxes.push(new Box(gl, [x, y, z], 4, 5, 6));
+    // Box obstacle (more crate-like proportions)
+    boxes.push(new Box(gl, [x, y, z], 3.5, 4.5, 5));
   }
 
   for (var i = 0; i < 10; i++) {
@@ -538,6 +559,14 @@ function main() {
       trainT[i].pos[2] += train_speeds[i];
       trainL[i].pos[2] += train_speeds[i];
       trainR[i].pos[2] += train_speeds[i];
+      // Sync extra parts (bottom, back, 4 wheels) with the train
+      for (var j = 0; j < 6; j++) {
+        trainExtra[i * 6 + j].pos[2] += train_speeds[i];
+      }
+      // Rotate wheels based on speed (scaled for visual effect)
+      for (var j = 2; j < 6; j++) {
+        trainExtra[i * 6 + j].rotation += train_speeds[i] * 0.5;
+      }
     }
 
     // coins collecting
@@ -915,6 +944,9 @@ function drawScene(gl, programInfo, deltaTime) {
     trainT[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
     trainL[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
     trainR[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+  }
+  for (var i = 0; i < trainExtra.length; i++) {
+    trainExtra[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 
   var num_boxes = boxes.length;
