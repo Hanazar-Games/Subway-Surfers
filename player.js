@@ -239,6 +239,11 @@ let Player = class {
     }
 
     drawCube(gl, projectionMatrix, programInfo, deltaTime) {
+        // Draw shadow slightly below feet
+        gl.disable(gl.DEPTH_TEST);
+        drawShadow(gl, projectionMatrix, programInfo, this.pos[0], this.pos[1] - 1.02, this.pos[2], 0.35, 0.22);
+        gl.enable(gl.DEPTH_TEST);
+
         const modelViewMatrix = mat4.create();
         mat4.translate(
             modelViewMatrix,

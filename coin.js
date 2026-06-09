@@ -85,6 +85,11 @@ let Coin = class {
             this.pos
         );
 
+        // Coin floating animation
+        var t = Date.now() * 0.004;
+        var floatY = Math.sin(t) * 0.08;
+        mat4.translate(modelViewMatrix, modelViewMatrix, [0, floatY, 0]);
+
         mat4.rotate(modelViewMatrix,
             modelViewMatrix,
             this.rotation,
