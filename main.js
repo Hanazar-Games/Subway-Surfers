@@ -76,6 +76,8 @@ var lastCoinTime = 0;
 var trailTimer = 0;
 var sparkTimer = 0;
 var lastMilestone = 0;
+var nearMissTimer = 0;
+var envParticles = []; // ambient floating dust
 
 var cubeRotation = 0;
 
@@ -601,6 +603,16 @@ function main() {
   hoverboard.push(new Hoverboard(gl, [0, 0, -150], 1.5, 1.5, 1.5));
   hoverboard.push(new Hoverboard(gl, [0, 0, -400], 1.5, 1.5, 1.5));
 
+  // Initialize ambient dust particles (small golden motes floating in light shafts)
+  for (var i = 0; i < 30; i++) {
+    envParticles.push({
+      pos: [(Math.random()-0.5)*20, Math.random()*8 - 2, -Math.random()*100],
+      vel: [(Math.random()-0.5)*0.3, (Math.random()-0.5)*0.1, (Math.random()-0.5)*0.3],
+      baseY: 0,
+      phase: Math.random()*Math.PI*2
+    });
+  }
+
   var then = 0;
 
   function render(now) {
@@ -699,6 +711,26 @@ function main() {
       }
     }
 
+    // x3 multiplier golden aura pulse
+    if (scoreMultiplier >= 3) {
+      var pulsePhase = Date.now() * 0.003;
+      if (Math.sin(pulsePhase) > 0.95 && typeof flashScreen === 'function') {
+        flashScreen('rgba(255,215,0,0.08)', 0.1);
+      }
+    }
+
+    // Train proximity warning (red edge flash when train is close behind on same track)
+    var num_trains_warn = trainF.length;
+    for (var i = 0; i < num_trains_warn; i++) {
+      if (trainF[i].pos[0] == player.pos[0]) {
+        var zdist_warn = player.pos[2] - trainF[i].pos[2];
+        if (zdist_warn > 5 && zdist_warn < 20) {
+          if (typeof flashScreen === 'function') flashScreen('rgba(255,0,0,0.06)', 0.08);
+          break;
+        }
+      }
+    }
+
     if (!player.fly_boost) {
       // jump
       if (jumping) {
@@ -751,6 +783,8 @@ function main() {
           if (player.pos[1] < -4 && !ducking) {
             if (wasInAir) {
               wasInAir = false;
+              // Landing camera dip
+              cam_y_target -= 0.4;
               for (var p = 0; p < 8; p++) {
                 var vx = (Math.random() - 0.5) * 3.0;
                 var vy = Math.random() * 2.0 + 0.5;
@@ -883,6 +917,23 @@ function main() {
               }
               Die();
               if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
+            }
+          }
+          // Near miss: same track, very close z, but player is above the train
+          var zdistTrain = player.pos[2] - trainF[i].pos[2];
+          if (zdistTrain > -18 && zdistTrain < -15 && player.pos[1] > trainT[i].pos[1] + 2) {
+            var now = Date.now() * 0.001;
+            if (now - nearMissTimer > 1.0) {
+              nearMissTimer = now;
+              coins_collected += 1;
+              playCoinSound();
+              if (typeof showComboText === 'function') {
+                var rect = document.getElementById('glcanvas').getBoundingClientRect();
+                showComboText('Near Miss!', rect.left + rect.width / 2, rect.top + rect.height * 0.3);
+              }
+              for (var p = 0; p < 6; p++) {
+                particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [(Math.random()-0.5)*3, Math.random()*2+1, (Math.random()-0.5)*3], 0.4, glow_gold_texture));
+              }
             }
           }
         }
@@ -1215,6 +1266,20 @@ function main() {
       }
     }
 
+    // update ambient dust particles
+    var dustTime = Date.now() * 0.001;
+    for (var i = 0; i < envParticles.length; i++) {
+      var ep = envParticles[i];
+      ep.pos[0] += ep.vel[0] * deltaTime;
+      ep.pos[1] += ep.vel[1] * deltaTime + Math.sin(dustTime + ep.phase) * 0.002;
+      ep.pos[2] += ep.vel[2] * deltaTime;
+      // wrap around relative to camera
+      if (ep.pos[2] > cam_z + 5) ep.pos[2] -= 90;
+      if (ep.pos[2] < cam_z - 85) ep.pos[2] += 90;
+      if (ep.pos[0] > 12) ep.pos[0] -= 24;
+      if (ep.pos[0] < -12) ep.pos[0] += 24;
+    }
+
     // apply camera shake (collision / impact feedback)
     var origCamX = cam_x;
     var origCamY = cam_y;
@@ -1320,10 +1385,24 @@ function drawScene(gl, programInfo, deltaTime) {
     track1[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
     track2[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
     track3[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    if (theme == 1)
+  }
+
+  // Background parallax: city/wall move slower than foreground
+  var parallaxOffset = cam_z * 0.06;
+  var bgStart = Math.max(0, Math.floor(-(cullNear + 5 + parallaxOffset) / 10));
+  var bgEnd = Math.min(1000, Math.ceil(-(cullFar - 5 + parallaxOffset) / 10));
+  for (var i = bgStart; i < bgEnd; i += 1) {
+    if (theme == 1) {
+      var origZ = city[i].pos[2];
+      city[i].pos[2] = origZ - parallaxOffset;
       city[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    else if (theme == 2)
+      city[i].pos[2] = origZ;
+    } else if (theme == 2) {
+      var origZ = wall[i].pos[2];
+      wall[i].pos[2] = origZ - parallaxOffset;
       wall[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      wall[i].pos[2] = origZ;
+    }
   }
 
   player.drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
@@ -1439,6 +1518,17 @@ function drawScene(gl, programInfo, deltaTime) {
   for (var i = 0; i < 2; i++) {
     if (hoverboard[i].exist && hoverboard[i].pos[2] < cullNear && hoverboard[i].pos[2] > cullFar)
       hoverboard[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+  }
+
+  // Ambient dust particles (tiny glowing motes)
+  if (typeof drawGlow === 'function') {
+    for (var i = 0; i < envParticles.length; i++) {
+      var ep = envParticles[i];
+      if (ep.pos[2] < cullNear && ep.pos[2] > cullFar) {
+        drawGlow(gl, viewProjectionMatrix, programInfo, dust_texture,
+          ep.pos[0], ep.pos[1], ep.pos[2], 0.04, 0.04);
+      }
+    }
   }
 }
 
