@@ -1210,7 +1210,14 @@ function drawScene(gl, programInfo, deltaTime) {
   gl.uniform1f(programInfo.uniformLocations.uFogNear, 25.0);
   gl.uniform1f(programInfo.uniformLocations.uFogFar, 90.0);
 
-  for (var i = 0; i < 1000; i += 1) {
+  // Distance-based culling bounds
+  var cullNear = cam_z + 8;
+  var cullFar = cam_z - 95;
+
+  // Compute visible track range (tracks at z = -i * 5)
+  var iStart = Math.max(0, Math.floor(-(cullNear + 5) / 5));
+  var iEnd = Math.min(1000, Math.ceil(-(cullFar - 5) / 5));
+  for (var i = iStart; i < iEnd; i += 1) {
     track1[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
     track2[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
     track3[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
@@ -1226,69 +1233,80 @@ function drawScene(gl, programInfo, deltaTime) {
 
   var num_coins = coins.length;
   for (var i = 0; i < num_coins; i++) {
-    if (coins[i].exist == true)
+    if (coins[i].exist && coins[i].pos[2] < cullNear && coins[i].pos[2] > cullFar)
       coins[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 
   // draw particles on top of coins
   for (var i = 0; i < particles.length; i++) {
-    particles[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    if (particles[i].pos[2] < cullNear && particles[i].pos[2] > cullFar)
+      particles[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 
   var num_trains = trainF.length;
   for (var i = 0; i < num_trains; i++) {
-    trainF[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    trainT[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    trainL[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    trainR[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    if (trainF[i].pos[2] < cullNear && trainF[i].pos[2] > cullFar) {
+      trainF[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      trainT[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      trainL[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      trainR[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    }
   }
   for (var i = 0; i < trainExtra.length; i++) {
-    trainExtra[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    if (trainExtra[i].pos[2] < cullNear && trainExtra[i].pos[2] > cullFar)
+      trainExtra[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 
   var num_boxes = boxes.length;
   for (var i = 0; i < num_boxes; i++) {
-    boxes[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    if (boxes[i].pos[2] < cullNear && boxes[i].pos[2] > cullFar)
+      boxes[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 
   var num_manholes = manholes.length;
   for (var i = 0; i < num_manholes; i++) {
-    manholes[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    if (manholes[i].pos[2] < cullNear && manholes[i].pos[2] > cullFar)
+      manholes[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 
   var num_high = duck_obs_stop.length;
   for (var i = 0; i < num_high; i++) {
-    duck_obs_stop[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    duck_obs_stand1[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    duck_obs_stand2[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    if (duck_obs_stop[i].pos[2] < cullNear && duck_obs_stop[i].pos[2] > cullFar) {
+      duck_obs_stop[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      duck_obs_stand1[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      duck_obs_stand2[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    }
   }
 
   var num_low = jump_obs.length;
   for (var i = 0; i < num_low; i++) {
-    jump_obs[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    if (jump_obs[i].pos[2] < cullNear && jump_obs[i].pos[2] > cullFar)
+      jump_obs[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 
   var num_rope = rope_stop.length;
   for (var i = 0; i < num_rope; i++) {
-    rope_stand1[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    rope_stand2[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    rope_stop[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    if (rope_stop[i].pos[2] < cullNear && rope_stop[i].pos[2] > cullFar) {
+      rope_stand1[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      rope_stand2[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      rope_stop[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    }
   }
 
   var num_boots = boots.length;
   for (var i = 0; i < num_boots; i++) {
-    if (boots[i].exist)
+    if (boots[i].exist && boots[i].pos[2] < cullNear && boots[i].pos[2] > cullFar)
       boots[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 
   var num_boost = flying_boost.length;
   for (var i = 0; i < num_boost; i++) {
-    if (flying_boost[i].exist)
+    if (flying_boost[i].exist && flying_boost[i].pos[2] < cullNear && flying_boost[i].pos[2] > cullFar)
       flying_boost[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 
   for (var i = 0; i < 2; i++) {
-    if (hoverboard[i].exist)
+    if (hoverboard[i].exist && hoverboard[i].pos[2] < cullNear && hoverboard[i].pos[2] > cullFar)
       hoverboard[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
   }
 }
