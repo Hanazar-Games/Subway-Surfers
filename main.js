@@ -1480,7 +1480,12 @@ function drawScene(gl, programInfo, deltaTime) {
   if (theme_flag == 1) {
     applyTheme(theme);
     if (theme == 1) {
-      gl.clearColor(144 / 256, 228 / 256, 252 / 256, 1.0);
+      // Subtle warm shift as speed increases
+      var speedRatio = Math.min(1, (player_speed - 0.5) / 0.5);
+      var r = 144 / 256 + speedRatio * 0.05;
+      var g = 228 / 256 - speedRatio * 0.02;
+      var b = 252 / 256 - speedRatio * 0.05;
+      gl.clearColor(r, g, b, 1.0);
       if (greyScale)
         gl.clearColor(50 / 255, 50 / 255, 50 / 255, 1.0);
     }
