@@ -1325,6 +1325,28 @@ function drawScene(gl, programInfo, deltaTime) {
     }
   }
 
+  // Obstacle shadows
+  gl.disable(gl.DEPTH_TEST);
+  for (var i = 0; i < num_trains; i++) {
+    if (trainF[i].pos[2] < cullNear && trainF[i].pos[2] > cullFar) {
+      if (typeof drawShadow === 'function')
+        drawShadow(gl, viewProjectionMatrix, programInfo, trainF[i].pos[0], -5.1, trainF[i].pos[2] - 5, 2.0, 8.0);
+    }
+  }
+  for (var i = 0; i < num_boxes; i++) {
+    if (boxes[i].pos[2] < cullNear && boxes[i].pos[2] > cullFar) {
+      if (typeof drawShadow === 'function')
+        drawShadow(gl, viewProjectionMatrix, programInfo, boxes[i].pos[0], -5.1, boxes[i].pos[2], 1.8, 1.8);
+    }
+  }
+  for (var i = 0; i < num_manholes; i++) {
+    if (manholes[i].pos[2] < cullNear && manholes[i].pos[2] > cullFar) {
+      if (typeof drawShadow === 'function')
+        drawShadow(gl, viewProjectionMatrix, programInfo, manholes[i].pos[0], -5.05, manholes[i].pos[2], 1.5, 1.5);
+    }
+  }
+  gl.enable(gl.DEPTH_TEST);
+
   var num_boxes = boxes.length;
   for (var i = 0; i < num_boxes; i++) {
     if (boxes[i].pos[2] < cullNear && boxes[i].pos[2] > cullFar)
