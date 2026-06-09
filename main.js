@@ -43,6 +43,7 @@ var fb_texture;
 var hoverboard_texture;
 var particle_texture;
 var dust_texture;
+var glow_cyan_texture, glow_pink_texture, glow_gold_texture;
 
 // Theme texture caches (preload both themes to avoid runtime reloads)
 var themeTextures = {1: {}, 2: {}};
@@ -343,6 +344,9 @@ function main() {
   };
   particle_texture = loadTexture(gl, 'assets/1_Coin.jpg');
   dust_texture = loadTexture(gl, 'assets/1_Dust.png');
+  glow_cyan_texture = loadTexture(gl, 'assets/1_GlowCyan.png');
+  glow_pink_texture = loadTexture(gl, 'assets/1_GlowPink.png');
+  glow_gold_texture = loadTexture(gl, 'assets/1_GlowGold.png');
 
   applyTheme(1);
 
@@ -764,10 +768,21 @@ function main() {
       }
     }
 
-    // coins collecting
+    // coins collecting + magnet pull effect
     var num_coins = coins.length;
     for (var i = 0; i < num_coins; i++) {
       if (coins[i].exist == true) {
+        // Magnet pull: if coin is close horizontally and vertically, pull it toward player
+        var dx = player.pos[0] - coins[i].pos[0];
+        var dy = player.pos[1] - coins[i].pos[1];
+        var dz = player.pos[2] - coins[i].pos[2];
+        var distSq = dx*dx + dy*dy + dz*dz;
+        if (distSq < 36.0) { // within 6 units
+          var pull = 0.08;
+          coins[i].pos[0] += dx * pull;
+          coins[i].pos[1] += dy * pull;
+          coins[i].pos[2] += dz * pull;
+        }
         if (coins[i].pos[0] == player.pos[0]) {
           if (coins[i].pos[1] >= player.pos[1] - 0.75 && coins[i].pos[1] <= player.pos[1] + 0.75) {
             if (coins[i].pos[2] >= player.pos[2] - 0.5 && coins[i].pos[2] <= player.pos[2] + 0.5) {
@@ -814,6 +829,13 @@ function main() {
               score = -player.pos[2] + coins_collected;
               cameraShake = 0.6;
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
+              // Death explosion particles
+              for (var p = 0; p < 20; p++) {
+                var vx = (Math.random() - 0.5) * 8.0;
+                var vy = Math.random() * 6.0 + 2.0;
+                var vz = (Math.random() - 0.5) * 8.0;
+                particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
+              }
               Die();
               if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
@@ -830,6 +852,13 @@ function main() {
               score = -player.pos[2] + coins_collected;
               cameraShake = 0.6;
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
+              // Death explosion particles
+              for (var p = 0; p < 20; p++) {
+                var vx = (Math.random() - 0.5) * 8.0;
+                var vy = Math.random() * 6.0 + 2.0;
+                var vz = (Math.random() - 0.5) * 8.0;
+                particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
+              }
               Die();
               if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
@@ -846,6 +875,13 @@ function main() {
               score = -player.pos[2] + coins_collected;
               cameraShake = 0.6;
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
+              // Death explosion particles
+              for (var p = 0; p < 20; p++) {
+                var vx = (Math.random() - 0.5) * 8.0;
+                var vy = Math.random() * 6.0 + 2.0;
+                var vz = (Math.random() - 0.5) * 8.0;
+                particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
+              }
               Die();
               if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
             }
@@ -976,6 +1012,12 @@ function main() {
               player.jumping_boots = true;
               playPowerUpSound();
               if (typeof flashScreen === 'function') flashScreen('#05d9e8', 0.4);
+              for (var p = 0; p < 12; p++) {
+                var vx = (Math.random() - 0.5) * 5.0;
+                var vy = Math.random() * 4.0 + 1.0;
+                var vz = (Math.random() - 0.5) * 5.0;
+                particles.push(new Particle(gl, [boots[i].pos[0], boots[i].pos[1], boots[i].pos[2]], [vx, vy, vz], 0.6 + Math.random() * 0.3, glow_cyan_texture));
+              }
               d = new Date();
               boots_acquired = d.getTime() * 0.001;
               jump_height = 3;
@@ -998,6 +1040,12 @@ function main() {
               player.fly_boost = true;
               playPowerUpSound();
               if (typeof flashScreen === 'function') flashScreen('#ff2a6d', 0.4);
+              for (var p = 0; p < 12; p++) {
+                var vx = (Math.random() - 0.5) * 5.0;
+                var vy = Math.random() * 4.0 + 1.0;
+                var vz = (Math.random() - 0.5) * 5.0;
+                particles.push(new Particle(gl, [flying_boost[i].pos[0], flying_boost[i].pos[1], flying_boost[i].pos[2]], [vx, vy, vz], 0.6 + Math.random() * 0.3, glow_pink_texture));
+              }
               dog.pos[2] -= 10;
               player.pos[1] = 10;
               cam_y = player.pos[1] + 9;
@@ -1042,6 +1090,12 @@ function main() {
               player.hoverboard = true;
               playPowerUpSound();
               if (typeof flashScreen === 'function') flashScreen('#ffd700', 0.4);
+              for (var p = 0; p < 12; p++) {
+                var vx = (Math.random() - 0.5) * 5.0;
+                var vy = Math.random() * 4.0 + 1.0;
+                var vz = (Math.random() - 0.5) * 5.0;
+                particles.push(new Particle(gl, [hoverboard[i].pos[0], hoverboard[i].pos[1], hoverboard[i].pos[2]], [vx, vy, vz], 0.6 + Math.random() * 0.3, glow_gold_texture));
+              }
               d = new Date();
               hoverboard_acquired = d.getTime() * 0.001;
               jumping = false;
@@ -1255,6 +1309,16 @@ function drawScene(gl, programInfo, deltaTime) {
   for (var i = 0; i < trainExtra.length; i++) {
     if (trainExtra[i].pos[2] < cullNear && trainExtra[i].pos[2] > cullFar)
       trainExtra[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+  }
+
+  // Train headlight glows (drawn after opaque geometry with additive blend)
+  for (var i = 0; i < num_trains; i++) {
+    if (trainF[i].pos[2] < cullNear && trainF[i].pos[2] > cullFar) {
+      if (typeof drawGlow === 'function') {
+        drawGlow(gl, viewProjectionMatrix, programInfo, glow_gold_texture,
+          trainF[i].pos[0], trainF[i].pos[1] + 1.5, trainF[i].pos[2] + 10, 1.2, 1.2);
+      }
+    }
   }
 
   var num_boxes = boxes.length;

@@ -49,6 +49,10 @@ let Particle = class {
         this.pos[1] += this.velocity[1] * deltaTime;
         this.pos[2] += this.velocity[2] * deltaTime;
         this.velocity[1] -= 2.0 * deltaTime; // gravity
+        // air resistance / drag
+        this.velocity[0] *= 0.98;
+        this.velocity[1] *= 0.98;
+        this.velocity[2] *= 0.98;
         this.life -= deltaTime;
     }
 
