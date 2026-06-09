@@ -279,10 +279,14 @@ function main() {
     uniform highp vec3 uFogColor;
     uniform highp float uFogNear;
     uniform highp float uFogFar;
+    uniform highp float uGlow;
 
     void main(void) {
       highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
       highp vec4 litColor = vec4(texelColor.rgb * vLighting, texelColor.a);
+
+      // Neon glow boost
+      litColor.rgb += texelColor.rgb * uGlow;
 
       highp float fogAmount = smoothstep(uFogNear, uFogFar, vFogDepth);
       gl_FragColor = mix(litColor, vec4(uFogColor, 1.0), fogAmount);
@@ -298,10 +302,13 @@ function main() {
     uniform highp vec3 uFogColor;
     uniform highp float uFogNear;
     uniform highp float uFogFar;
+    uniform highp float uGlow;
 
     void main(void) {
       highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
       highp vec4 litColor = vec4(texelColor.rrr * vLighting, texelColor.a);
+
+      litColor.rgb += texelColor.rrr * uGlow;
 
       highp float fogAmount = smoothstep(uFogNear, uFogFar, vFogDepth);
       gl_FragColor = mix(litColor, vec4(uFogColor, 1.0), fogAmount);
@@ -370,6 +377,7 @@ function main() {
       uFogColor: gl.getUniformLocation(shaderProgram, 'uFogColor'),
       uFogNear: gl.getUniformLocation(shaderProgram, 'uFogNear'),
       uFogFar: gl.getUniformLocation(shaderProgram, 'uFogFar'),
+      uGlow: gl.getUniformLocation(shaderProgram, 'uGlow'),
     },
   };
 
@@ -1299,6 +1307,7 @@ function drawScene(gl, programInfo, deltaTime) {
   gl.uniform3fv(programInfo.uniformLocations.uFogColor, fogColor);
   gl.uniform1f(programInfo.uniformLocations.uFogNear, 25.0);
   gl.uniform1f(programInfo.uniformLocations.uFogFar, 90.0);
+  gl.uniform1f(programInfo.uniformLocations.uGlow, theme == 2 ? 0.35 : 0.0);
 
   // Distance-based culling bounds
   var cullNear = cam_z + 8;
