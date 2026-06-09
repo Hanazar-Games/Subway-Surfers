@@ -881,6 +881,7 @@ function main() {
               wasInAir = false;
               // Landing camera dip
               cam_y_target -= 0.4;
+              if (typeof playBumpSound === 'function') playBumpSound();
               for (var p = 0; p < 8; p++) {
                 var vx = (Math.random() - 0.5) * 3.0;
                 var vy = Math.random() * 2.0 + 0.5;
