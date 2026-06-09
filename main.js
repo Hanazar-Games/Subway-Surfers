@@ -773,6 +773,7 @@ function main() {
             if (coins[i].pos[2] >= player.pos[2] - 0.5 && coins[i].pos[2] <= player.pos[2] + 0.5) {
               coins[i].exist = false;
               var now = Date.now() * 0.001;
+              var prevMult = scoreMultiplier;
               if (now - lastCoinTime < 2.0) {
                 multiplierStreak += 1;
               } else {
@@ -782,6 +783,12 @@ function main() {
               if (multiplierStreak >= 20) scoreMultiplier = 3;
               else if (multiplierStreak >= 10) scoreMultiplier = 2;
               else scoreMultiplier = 1;
+              if (scoreMultiplier > prevMult && typeof showComboText === 'function') {
+                var rect = document.getElementById('glcanvas').getBoundingClientRect();
+                var screenX = rect.left + rect.width / 2 + (player.pos[0] / 6) * rect.width * 0.3;
+                var screenY = rect.top + rect.height * 0.4;
+                showComboText('x' + scoreMultiplier + '!', screenX, screenY);
+              }
               coins_collected += scoreMultiplier;
               playCoinSound();
               // Spawn sparkle particles on coin collect

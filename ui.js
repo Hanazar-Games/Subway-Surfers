@@ -669,6 +669,7 @@ var gamePaused = false;
 
     // Background particles
     initParticles();
+    initSpeedLines();
 
     // Button ripple effect
     document.querySelectorAll('.btn').forEach(function (btn) {
@@ -743,5 +744,73 @@ var gamePaused = false;
     }
     requestAnimationFrame(draw);
   }
+
+  // ===== Speed Lines Overlay =====
+  function initSpeedLines() {
+    var canvas = document.getElementById('speed-lines');
+    if (!canvas) return;
+    var ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    function resize() {
+      var rect = canvas.parentNode.getBoundingClientRect();
+      canvas.width = rect.width;
+      canvas.height = rect.height;
+    }
+    resize();
+    window.addEventListener('resize', resize);
+
+    var speedLines = [];
+    var speedLineTimer = 0;
+
+    function draw() {
+      ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+      if (currentScreen === 'playing') {
+        speedLineTimer += 1;
+        if (speedLineTimer > 2) {
+          speedLineTimer = 0;
+          if (speedLines.length < 40) {
+            speedLines.push({
+              x: canvas.width + Math.random() * 100,
+              y: Math.random() * canvas.height,
+              w: 30 + Math.random() * 120,
+              h: 1 + Math.random() * 2,
+              speed: 8 + Math.random() * 12,
+              alpha: 0.15 + Math.random() * 0.25,
+            });
+          }
+        }
+        for (var i = speedLines.length - 1; i >= 0; i--) {
+          var s = speedLines[i];
+          s.x -= s.speed;
+          s.alpha -= 0.008;
+          if (s.x + s.w < 0 || s.alpha <= 0) {
+            speedLines.splice(i, 1);
+            continue;
+          }
+          ctx.fillStyle = 'rgba(255,255,255,' + s.alpha + ')';
+          ctx.fillRect(s.x, s.y, s.w, s.h);
+        }
+      } else {
+        speedLines = [];
+      }
+      requestAnimationFrame(draw);
+    }
+    requestAnimationFrame(draw);
+  }
+
+  // ===== Floating combo text =====
+  window.showComboText = function(text, x, y) {
+    var el = document.createElement('div');
+    el.textContent = text;
+    el.style.cssText = 'position:fixed;left:' + x + 'px;top:' + y + 'px;'
+      + 'font-size:28px;font-weight:900;color:var(--neon-cyan);'
+      + 'text-shadow:0 0 12px rgba(5,217,232,0.6);'
+      + 'pointer-events:none;z-index:300;transform:translate(-50%,-50%);'
+      + 'animation:comboFloat 1s ease-out forwards;';
+    document.body.appendChild(el);
+    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 1000);
+  };
 
 })();

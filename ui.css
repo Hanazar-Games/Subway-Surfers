@@ -831,3 +831,10 @@ html, body {
     max-height: calc(100vh - 40px);
   }
 }
+
+/* ===== Combo floating text animation ===== */
+@keyframes comboFloat {
+  0%   { opacity: 1; transform: translate(-50%, -50%) scale(0.6); }
+  20%  { opacity: 1; transform: translate(-50%, -50%) scale(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -120%) scale(1.0); }
+}
