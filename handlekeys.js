@@ -21,11 +21,13 @@ document.addEventListener(
             player.pos[0] += 6;
             police.pos[0] = player.pos[0];
             if (player) player.tilt = -0.25;
+            if (typeof playBumpSound === 'function') playBumpSound();
         }
         if (key == 37) {
             player.pos[0] -= 6;
             police.pos[0] = player.pos[0];
             if (player) player.tilt = 0.25;
+            if (typeof playBumpSound === 'function') playBumpSound();
         }
         if (key == 38) {
             if (player.pos[1] < -4) {
