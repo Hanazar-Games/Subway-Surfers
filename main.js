@@ -248,7 +248,18 @@ main();
 function main() {
   try {
 
-    document.getElementById('music').play();
+    var musicEl = document.getElementById('music');
+    if (musicEl) {
+      musicEl.volume = 0;
+      musicEl.play();
+      var fadeIn = setInterval(function() {
+        if (musicEl.volume < 0.5) {
+          musicEl.volume = Math.min(0.5, musicEl.volume + 0.02);
+        } else {
+          clearInterval(fadeIn);
+        }
+      }, 100);
+    }
 
     const canvas = document.querySelector('#glcanvas');
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
