@@ -63,6 +63,90 @@ var coins_collected = 0;
 
 var cubeRotation = 0;
 
+// ========== Web Audio SFX ==========
+var audioCtx = null;
+var sfxMasterGain = null;
+
+function initSfx() {
+    if (audioCtx) return;
+    var AudioContext = window.AudioContext || window.webkitAudioContext;
+    if (!AudioContext) return;
+    audioCtx = new AudioContext();
+    sfxMasterGain = audioCtx.createGain();
+    sfxMasterGain.gain.value = 0.4;
+    sfxMasterGain.connect(audioCtx.destination);
+}
+
+function resumeSfx() {
+    if (audioCtx && audioCtx.state === 'suspended') {
+        audioCtx.resume();
+    }
+}
+
+function playCoinSound() {
+    initSfx();
+    resumeSfx();
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'sine';
+    osc.frequency.setValueAtTime(1100, t);
+    osc.frequency.exponentialRampToValueAtTime(1900, t + 0.08);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.25, t + 0.01);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.18);
+    osc.connect(gain);
+    gain.connect(sfxMasterGain);
+    osc.start(t);
+    osc.stop(t + 0.2);
+}
+
+function playPowerUpSound() {
+    initSfx();
+    resumeSfx();
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime;
+    // Two rising tones for power-up jingle
+    var osc1 = audioCtx.createOscillator();
+    var osc2 = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc1.type = 'sine';
+    osc2.type = 'triangle';
+    osc1.frequency.setValueAtTime(523, t);
+    osc1.frequency.exponentialRampToValueAtTime(1046, t + 0.25);
+    osc2.frequency.setValueAtTime(659, t);
+    osc2.frequency.exponentialRampToValueAtTime(1318, t + 0.25);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.25, t + 0.03);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.35);
+    osc1.connect(gain);
+    osc2.connect(gain);
+    gain.connect(sfxMasterGain);
+    osc1.start(t);
+    osc2.start(t);
+    osc1.stop(t + 0.4);
+    osc2.stop(t + 0.4);
+}
+
+function playBumpSound() {
+    initSfx();
+    resumeSfx();
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'sawtooth';
+    osc.frequency.setValueAtTime(180, t);
+    osc.frequency.exponentialRampToValueAtTime(60, t + 0.25);
+    gain.gain.setValueAtTime(0.3, t);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.25);
+    osc.connect(gain);
+    gain.connect(sfxMasterGain);
+    osc.start(t);
+    osc.stop(t + 0.3);
+}
+
 main();
 
 function main() {
@@ -582,6 +666,7 @@ function main() {
             if (coins[i].pos[2] >= player.pos[2] - 0.5 && coins[i].pos[2] <= player.pos[2] + 0.5) {
               coins[i].exist = false;
               coins_collected += 1;
+              playCoinSound();
               // Spawn sparkle particles on coin collect
               for (var p = 0; p < 6; p++) {
                 var vx = (Math.random() - 0.5) * 4.0;
@@ -653,6 +738,7 @@ function main() {
                 }
                 else {
                   cameraShake = 0.3;
+                  playBumpSound();
                   obstacle_hit = i;
                   player.speedz = player_speed / 2;
                   policeCaughtUp = d.getTime() * 0.001;
@@ -678,6 +764,7 @@ function main() {
                 }
                 else {
                   cameraShake = 0.3;
+                  playBumpSound();
                   obstacle_hit = i;
                   player.speedz = player_speed / 2;
                   policeCaughtUp = d.getTime() * 0.001;
@@ -702,6 +789,7 @@ function main() {
               }
               else {
                 cameraShake = 0.3;
+                playBumpSound();
                 obstacle_hit = i;
                 player.speedz = player_speed / 2;
                 policeCaughtUp = d.getTime() * 0.001;
@@ -756,6 +844,7 @@ function main() {
             if (player.pos[2] >= boots[i].pos[2] - 1.2 && player.pos[2] <= boots[i].pos[2] + 1.2) {
               boots[i].exist = false;
               player.jumping_boots = true;
+              playPowerUpSound();
               d = new Date();
               boots_acquired = d.getTime() * 0.001;
               jump_height = 3;
@@ -776,6 +865,7 @@ function main() {
             if (player.pos[2] >= flying_boost[i].pos[2] - 1.75 && player.pos[2] <= flying_boost[i].pos[2] + 1.75) {
               flying_boost[i].exist = false;
               player.fly_boost = true;
+              playPowerUpSound();
               dog.pos[2] -= 10;
               player.pos[1] = 10;
               cam_y = player.pos[1] + 9;
@@ -818,6 +908,7 @@ function main() {
             if (player.pos[2] >= hoverboard[i].pos[2] - 1.2 && player.pos[2] <= hoverboard[i].pos[2] + 1.2) {
               hoverboard[i].exist = false;
               player.hoverboard = true;
+              playPowerUpSound();
               d = new Date();
               hoverboard_acquired = d.getTime() * 0.001;
               jumping = false;
