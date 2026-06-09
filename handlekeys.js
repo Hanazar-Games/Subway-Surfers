@@ -44,6 +44,7 @@ document.addEventListener(
                 ducking = true;
                 jumping = false;
                 player.speedy = 0.2;
+                if (typeof playBumpSound === 'function') playBumpSound();
             }
         }
 
