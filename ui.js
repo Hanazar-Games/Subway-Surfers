@@ -282,10 +282,16 @@ var gamePaused = false;
       var now = Date.now() * 0.001;
       // Score
       if (typeof score !== 'undefined' && score !== lastScore) {
+        var diff = Math.floor(score) - Math.floor(lastScore);
         lastScore = score;
         if (scoreEl) {
           scoreEl.textContent = formatNum(Math.floor(score));
           popScore(scoreEl);
+          // Score pop animation intensity based on change size
+          if (diff >= 5) {
+            scoreEl.style.transform = 'scale(1.25)';
+            setTimeout(function() { if (scoreEl) scoreEl.style.transform = ''; }, 150);
+          }
         }
       }
       // Coins
@@ -488,6 +494,12 @@ var gamePaused = false;
     if (bestWrap) bestWrap.style.display = '';
     if (bestV) {
       bestV.textContent = formatNum(getHighScore()) + (isNewBest ? ' ★' : '');
+    }
+    if (isNewBest && typeof showComboText === 'function') {
+      setTimeout(function() {
+        var rect = document.getElementById('glcanvas').getBoundingClientRect();
+        showComboText('NEW RECORD!', rect.left + rect.width / 2, rect.top + rect.height * 0.25);
+      }, 300);
     }
     // Show achievement unlock toast
     newAchievements.forEach(function (a, i) {
