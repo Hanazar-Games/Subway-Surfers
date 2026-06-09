@@ -835,6 +835,14 @@ function main() {
       }
     }
 
+    // Power-up active screen tint
+    if (player.hoverboard && typeof flashScreen === 'function') {
+      flashScreen('rgba(0,255,136,0.03)', 0.05);
+    }
+    if (player.fly_boost && typeof flashScreen === 'function') {
+      flashScreen('rgba(255,42,109,0.04)', 0.05);
+    }
+
     // Train proximity warning (red edge flash when train is close behind on same track)
     var num_trains_warn = trainF.length;
     for (var i = 0; i < num_trains_warn; i++) {
