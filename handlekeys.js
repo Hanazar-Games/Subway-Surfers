@@ -34,6 +34,7 @@ document.addEventListener(
             jumping = true;
             ducking = false;
             player.speedy = 0.3;
+            if (typeof playJumpSound === 'function') playJumpSound();
         }
         if (key == 40) {
             if (player.fly_boost == false) {

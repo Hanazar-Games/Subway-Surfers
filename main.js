@@ -206,6 +206,25 @@ function updateTrainRumble(intensity) {
     trainRumbleOsc.frequency.setTargetAtTime(40 + intensity * 15, t, 0.05);
 }
 
+function playJumpSound() {
+    initSfx();
+    resumeSfx();
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime;
+    var osc = audioCtx.createOscillator();
+    var gain = audioCtx.createGain();
+    osc.type = 'triangle';
+    osc.frequency.setValueAtTime(200, t);
+    osc.frequency.exponentialRampToValueAtTime(600, t + 0.1);
+    gain.gain.setValueAtTime(0, t);
+    gain.gain.linearRampToValueAtTime(0.2, t + 0.02);
+    gain.gain.exponentialRampToValueAtTime(0.001, t + 0.2);
+    osc.connect(gain);
+    gain.connect(sfxMasterGain);
+    osc.start(t);
+    osc.stop(t + 0.25);
+}
+
 function applyTheme(t) {
   track_texture = themeTextures[t].track;
   wall_texture = themeTextures[t].wall;
