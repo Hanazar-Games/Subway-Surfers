@@ -48,9 +48,11 @@ var glow_cyan_texture, glow_pink_texture, glow_gold_texture;
 // Theme texture caches (preload both themes to avoid runtime reloads)
 var themeTextures = {1: {}, 2: {}};
 
-var cam_x = 0, cam_y = 5, cam_z = 13.0;
+var cam_x = 0, cam_y = 5, cam_z = 30.0;
 var cam_y_target = 5;
+var cam_z_target = 13.0;
 var cameraShake = 0;
+var gameStartAnim = true;
 var target_x = 0, target_y = 0, target_z = cam_z - 10;
 var d, startTime, policeCaughtUp, obstacle_hit_time, flash_start_time, boots_acquired, fb_acquired, hoverboard_acquired;
 var theme = 1;
@@ -731,6 +733,15 @@ function main() {
     var camDiff = cam_y_target - cam_y;
     cam_y += camDiff * 0.08;
     target_y = cam_y - 5;
+
+    // start-of-game camera push-in animation
+    if (gameStartAnim) {
+      cam_z += (cam_z_target - cam_z) * 0.03;
+      if (Math.abs(cam_z - cam_z_target) < 0.1) {
+        cam_z = cam_z_target;
+        gameStartAnim = false;
+      }
+    }
 
     // recover tilt back to upright
     if (player.tilt > 0) { player.tilt -= 0.02; if (player.tilt < 0) player.tilt = 0; }
