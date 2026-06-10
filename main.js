@@ -1134,7 +1134,7 @@ function main() {
             if (player.pos[2] >= trainF[i].pos[2] - 18 && player.pos[2] <= trainF[i].pos[2]) {
               if (dying) break;
               score = -player.pos[2] + coins_collected;
-              cameraShake = 0.8;
+              cameraShake = 0.8; if (navigator.vibrate) navigator.vibrate(100);
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
               for (var p = 0; p < 20; p++) {
@@ -1180,7 +1180,7 @@ function main() {
             if (player.pos[2] <= boxes[i].pos[2] + 3 && player.pos[2] >= boxes[i].pos[2] - 3) {
               if (dying) break;
               score = -player.pos[2] + coins_collected;
-              cameraShake = 0.8;
+              cameraShake = 0.8; if (navigator.vibrate) navigator.vibrate(100);
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
               for (var p = 0; p < 20; p++) {
@@ -1206,7 +1206,7 @@ function main() {
             if (player.pos[2] <= manholes[i].pos[2] + 2.3 && player.pos[2] >= manholes[i].pos[2] - 2.3) {
               if (dying) break;
               score = -player.pos[2] + coins_collected;
-              cameraShake = 0.8;
+              cameraShake = 0.8; if (navigator.vibrate) navigator.vibrate(100);
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
               for (var p = 0; p < 20; p++) {
@@ -1236,7 +1236,7 @@ function main() {
                   if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
                 }
                 else {
-                  cameraShake = 0.3;
+                  cameraShake = 0.3; if (navigator.vibrate) navigator.vibrate(30);
                   playBumpSound();
                   if (typeof flashScreen === 'function') flashScreen('#ff8800', 0.15);
                   obstacle_hit = i;
@@ -1263,7 +1263,7 @@ function main() {
                   if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
                 }
                 else {
-                  cameraShake = 0.3;
+                  cameraShake = 0.3; if (navigator.vibrate) navigator.vibrate(30);
                   playBumpSound();
                   if (typeof flashScreen === 'function') flashScreen('#ff8800', 0.15);
                   obstacle_hit = i;
@@ -1289,7 +1289,7 @@ function main() {
                 if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
               }
               else {
-                cameraShake = 0.3;
+                cameraShake = 0.3; if (navigator.vibrate) navigator.vibrate(30);
                 playBumpSound();
                 obstacle_hit = i;
                 player.speedz = player_speed / 2;
@@ -1355,7 +1355,7 @@ function main() {
               }
               d = new Date();
               boots_acquired = d.getTime() * 0.001;
-              powersCollected += 1;
+              powersCollected += 1; if (navigator.vibrate) navigator.vibrate(20);
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Jump Boots!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
@@ -1391,7 +1391,7 @@ function main() {
               cam_y_target = player.pos[1] + 9;
               d = new Date();
               fb_acquired = d.getTime() * 0.001;
-              powersCollected += 1;
+              powersCollected += 1; if (navigator.vibrate) navigator.vibrate(20);
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Flying Boost!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
@@ -1442,7 +1442,7 @@ function main() {
               }
               d = new Date();
               hoverboard_acquired = d.getTime() * 0.001;
-              powersCollected += 1;
+              powersCollected += 1; if (navigator.vibrate) navigator.vibrate(20);
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Hoverboard!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
