@@ -69,7 +69,7 @@ var flashing = false;
 var train_speeds = new Array();
 var positions = new Array();
 var player_speed = 0.5;
-var currentFov = 45;
+var currentFov = 70; // starts wide, narrows during intro dive
 
 var score = 0;
 var coins_collected = 0;
@@ -92,6 +92,9 @@ var cubeRotation = 0;
 var vpMatrix = mat4.create(); // shared view-projection for world-to-screen
 var afterimages = []; // player afterimages on lane switch
 var shockwaves = []; // landing shockwave rings
+
+// Cached DOM refs (updated once on init)
+var _distFill = null, _distText = null, _streakBar = null, _streakPanel = null, _streakEl = null;
 
 // ========== Web Audio SFX ==========
 var audioCtx = null;
@@ -257,6 +260,12 @@ main();
 
 function main() {
   try {
+    // Cache DOM refs
+    _distFill = document.getElementById('distance-fill');
+    _distText = document.getElementById('distance-text');
+    _streakBar = document.getElementById('streak-bar');
+    _streakPanel = document.getElementById('hud-streak-panel');
+    _streakEl = document.getElementById('hud-streak');
 
     var musicEl = document.getElementById('music');
     if (musicEl) {
@@ -707,7 +716,8 @@ function main() {
       return;
     }
     now *= 0.001;  // convert to seconds
-    const deltaTime = now - then;
+    var deltaTime = now - then;
+    if (deltaTime > 0.1) deltaTime = 0.1; // cap to prevent tab-inactive jumps
     then = now;
 
     // Freeze frame on death impact (render but don't update)
@@ -740,12 +750,10 @@ function main() {
     var distance = -player.pos[2];
     player_speed = 0.5 + Math.min(0.5, distance / 3000);
     // Update distance progress bar
-    var distFill = document.getElementById('distance-fill');
-    var distText = document.getElementById('distance-text');
-    if (distFill && distText) {
+    if (_distFill && _distText) {
       var progress = Math.min(100, (distance / 800) * 100);
-      distFill.style.width = progress + '%';
-      distText.textContent = Math.floor(distance) + 'm / 800m';
+      _distFill.style.width = progress + '%';
+      _distText.textContent = Math.floor(distance) + 'm / 800m';
     }
     if (obstacle_hit == -1) {
       player.speedz = player_speed;
@@ -1112,13 +1120,11 @@ function main() {
               }
               coins_collected += scoreMultiplier;
               if (navigator.vibrate) navigator.vibrate(10);
-              var streakEl = document.getElementById('hud-streak');
-              var streakPanel = document.getElementById('hud-streak-panel');
-              if (streakEl && streakPanel) {
-                streakEl.textContent = multiplierStreak;
-                streakPanel.style.display = '';
-                streakEl.style.transform = 'scale(1.4)';
-                setTimeout(function() { if (streakEl) streakEl.style.transform = 'scale(1)'; }, 150);
+              if (_streakEl && _streakPanel) {
+                _streakEl.textContent = multiplierStreak;
+                _streakPanel.style.display = '';
+                _streakEl.style.transform = 'scale(1.4)';
+                setTimeout(function() { if (_streakEl) _streakEl.style.transform = 'scale(1)'; }, 150);
               }
               playCoinSound();
               // Score popup at coin position
@@ -1498,14 +1504,12 @@ function main() {
     if (nowTime - lastCoinTime >= 2.0 && scoreMultiplier > 1) {
       scoreMultiplier = 1;
       multiplierStreak = 0;
-      var streakPanel = document.getElementById('hud-streak-panel');
-      if (streakPanel) streakPanel.style.display = 'none';
+      if (_streakPanel) _streakPanel.style.display = 'none';
     }
     // Update streak bar
-    var streakBar = document.getElementById('streak-bar');
-    if (streakBar && multiplierStreak > 0) {
+    if (_streakBar && multiplierStreak > 0) {
       var rem = Math.max(0, 2.0 - (nowTime - lastCoinTime));
-      streakBar.style.width = (rem / 2.0 * 100) + '%';
+      _streakBar.style.width = (rem / 2.0 * 100) + '%';
     }
 
     // Update afterimages
@@ -1991,6 +1995,8 @@ function loadShader(gl, type, source) {
 }
 
 function Die() {
-  document.getElementById('music').pause();
-  document.getElementById('crash').play();
+  var music = document.getElementById('music');
+  var crash = document.getElementById('crash');
+  if (music) music.pause();
+  if (crash) { crash.currentTime = 0; crash.play().catch(function(){}); }
 }

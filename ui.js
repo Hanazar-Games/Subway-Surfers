@@ -110,18 +110,20 @@ var gamePaused = false;
     if (crashAudio) crashAudio.volume = s.sfx;
   }
   var fadeInterval = null;
-  function fadeAudio(targetVolume, duration) {
+  function fadeAudio(targetVolume, duration, onDone) {
     if (!gameAudio) return;
     var startVolume = gameAudio.volume || 0;
     var startTime = Date.now();
-    var endTime = startTime + duration;
     if (fadeInterval) clearInterval(fadeInterval);
     fadeInterval = setInterval(function() {
       var now = Date.now();
       var t = Math.min(1, (now - startTime) / duration);
       var vol = startVolume + (targetVolume - startVolume) * t;
       gameAudio.volume = Math.max(0, Math.min(1, vol));
-      if (t >= 1) clearInterval(fadeInterval);
+      if (t >= 1) {
+        clearInterval(fadeInterval);
+        if (onDone) onDone();
+      }
     }, 50);
   }
 
@@ -525,7 +527,7 @@ var gamePaused = false;
     gamePaused = true;
     stopHUDUpdate();
     hideHUD();
-    fadeAudio(0, 1000);
+    fadeAudio(0, 1000, function() { if (gameAudio) gameAudio.pause(); });
 
     var title = $('#result-title');
     var scoreV = $('#result-score');
@@ -759,11 +761,14 @@ var gamePaused = false;
       }
     }, { passive: true });
 
-    // ESC to pause/resume
+    // ESC to pause/resume, Enter/Space to restart from gameover
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         if (currentScreen === 'playing') uiPauseGame();
         else if (currentScreen === 'paused') uiResumeGame();
+      }
+      if ((e.key === 'Enter' || e.key === ' ') && currentScreen === 'gameover') {
+        uiRestartGame();
       }
     });
 
