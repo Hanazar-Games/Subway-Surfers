@@ -256,6 +256,23 @@ html, body {
   text-shadow: 0 0 10px rgba(255,215,0,0.3);
 }
 
+/* Streak countdown bar */
+.streak-bar-wrap {
+  width: 100%;
+  height: 3px;
+  background: rgba(255,255,255,0.08);
+  border-radius: 2px;
+  margin-top: 6px;
+  overflow: hidden;
+}
+.streak-bar {
+  height: 100%;
+  width: 100%;
+  background: linear-gradient(90deg, var(--neon-pink), var(--neon-cyan));
+  border-radius: 2px;
+  transition: width 0.1s linear;
+}
+
 .hud-pause-btn {
   width: 44px; height: 44px;
   display: flex; align-items: center; justify-content: center;

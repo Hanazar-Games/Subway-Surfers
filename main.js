@@ -1399,6 +1399,12 @@ function main() {
       var streakPanel = document.getElementById('hud-streak-panel');
       if (streakPanel) streakPanel.style.display = 'none';
     }
+    // Update streak bar
+    var streakBar = document.getElementById('streak-bar');
+    if (streakBar && multiplierStreak > 0) {
+      var rem = Math.max(0, 2.0 - (nowTime - lastCoinTime));
+      streakBar.style.width = (rem / 2.0 * 100) + '%';
+    }
 
     // Trail particles for hoverboard / flying boost
     trailTimer += deltaTime * timeDilation;
