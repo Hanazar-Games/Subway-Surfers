@@ -48,6 +48,8 @@ var gamePaused = false;
     if (hs) hs.classList.add('visible');
     var tc = $('#touch-controls');
     if (tc) tc.classList.add('visible');
+    var db = $('#distance-bar');
+    if (db) db.classList.add('visible');
   }
   function hideHUD() {
     screens.hud.classList.remove('visible');
@@ -55,6 +57,8 @@ var gamePaused = false;
     if (hs) hs.classList.remove('visible');
     var tc = $('#touch-controls');
     if (tc) tc.classList.remove('visible');
+    var db = $('#distance-bar');
+    if (db) db.classList.remove('visible');
   }
 
   // ===== Countdown =====

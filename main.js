@@ -724,6 +724,14 @@ function main() {
     // Difficulty scaling: speed slowly increases with distance
     var distance = -player.pos[2];
     player_speed = 0.5 + Math.min(0.5, distance / 3000);
+    // Update distance progress bar
+    var distFill = document.getElementById('distance-fill');
+    var distText = document.getElementById('distance-text');
+    if (distFill && distText) {
+      var progress = Math.min(100, (distance / 800) * 100);
+      distFill.style.width = progress + '%';
+      distText.textContent = Math.floor(distance) + 'm / 800m';
+    }
     if (obstacle_hit == -1) {
       player.speedz = player_speed;
     }
