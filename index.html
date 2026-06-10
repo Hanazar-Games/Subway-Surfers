@@ -416,7 +416,8 @@
   <!-- ===== UI Controller ===== -->
   <script src="./ui.js"></script>
 
-  <!-- ===== Game Engine Scripts (main.js loaded dynamically by ui.js) ===== -->
+  <!-- ===== Game Engine Scripts (main.js preloaded for instant start) ===== -->
+  <link rel="preload" as="script" href="./main.js">
   <script src="./gl-matrix.js"></script>
   <script src="./shadow_helper.js"></script>
   <script src="./cube.js"></script>

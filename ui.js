@@ -436,28 +436,29 @@ var gamePaused = false;
     var loading = $('#loading-overlay');
     if (loading) loading.classList.remove('hidden');
 
+    function startPlay() {
+      if (loading) loading.classList.add('hidden');
+      showScreen('playing');
+      runCountdown(function () {
+        showHUD();
+        startHUDUpdate();
+        showKeyHint();
+        var s = getAudioSettings();
+        if (gameAudio) { gameAudio.volume = 0; gameAudio.play().catch(function(){}); }
+        fadeAudio(s.music, 1500);
+      });
+    }
     if (typeof main !== 'function') {
       var s = document.createElement('script');
       s.src = './main.js';
-      s.onload = function () {
-        if (loading) loading.classList.add('hidden');
-        showScreen('playing');
-        runCountdown(function () {
-          showHUD();
-          startHUDUpdate();
-          showKeyHint();
-          var s = getAudioSettings();
-          if (gameAudio) { gameAudio.volume = 0; gameAudio.play().catch(function(){}); }
-          fadeAudio(s.music, 1500);
-        });
-      };
+      s.onload = startPlay;
       s.onerror = function () {
         if (loading) loading.classList.add('hidden');
         alert('Failed to load game. Please refresh and try again.');
       };
       document.body.appendChild(s);
     } else {
-      location.reload();
+      startPlay();
     }
   };
 
