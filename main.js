@@ -85,6 +85,7 @@ var nearMissTimer = 0;
 var envParticles = []; // ambient floating dust
 var dying = false;
 var deathTimer = 0;
+var freezeFrame = 0;
 var timeDilation = 1.0;
 
 var cubeRotation = 0;
@@ -705,6 +706,14 @@ function main() {
     const deltaTime = now - then;
     then = now;
 
+    // Freeze frame on death impact (render but don't update)
+    if (freezeFrame > 0) {
+      freezeFrame--;
+      drawScene(gl, programInfo, 0);
+      requestAnimationFrame(render);
+      return;
+    }
+
     d = new Date();
     if (obstacle_hit != -1) {
       if (d.getTime() * 0.001 - obstacle_hit_time >= 10) {
@@ -1134,7 +1143,7 @@ function main() {
                 particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
               }
               Die();
-              dying = true;
+              dying = true; freezeFrame = 3;
               deathTimer = 0;
               break;
             }
@@ -1180,7 +1189,7 @@ function main() {
                 particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
               }
               Die();
-              dying = true;
+              dying = true; freezeFrame = 3;
               deathTimer = 0;
               break;
             }
@@ -1206,7 +1215,7 @@ function main() {
                 particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
               }
               Die();
-              dying = true;
+              dying = true; freezeFrame = 3;
               deathTimer = 0;
               break;
             }
