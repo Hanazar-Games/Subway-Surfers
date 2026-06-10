@@ -902,6 +902,22 @@ html, body {
   100% { opacity: 0; transform: translate(-50%, -120%) scale(1.0); }
 }
 
+/* Record pulse animations */
+@keyframes recordPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); }
+  50% { transform: translate(-50%, -50%) scale(1.15); }
+}
+@keyframes nearRecordPulse {
+  0%, 100% { transform: translate(-50%, -50%) scale(1); opacity: 1; }
+  50% { transform: translate(-50%, -50%) scale(1.08); opacity: 0.85; }
+}
+.record-pulse {
+  animation: recordPulse 0.6s ease-in-out infinite;
+}
+.near-record-pulse {
+  animation: nearRecordPulse 0.8s ease-in-out infinite;
+}
+
 /* Score popup (+1, +2, etc) */
 .score-popup {
   position: fixed;

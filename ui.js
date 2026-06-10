@@ -296,6 +296,22 @@ var gamePaused = false;
             scoreEl.style.transform = 'scale(1.25)';
             setTimeout(function() { if (scoreEl) scoreEl.style.transform = ''; }, 150);
           }
+          // Near-record / new-record pulse
+          var best = getHighScore();
+          var cur = Math.floor(score);
+          if (cur > best) {
+            scoreEl.style.color = 'var(--neon-gold)';
+            scoreEl.style.textShadow = '0 0 15px rgba(255,215,0,0.5)';
+            scoreEl.classList.add('record-pulse');
+          } else if (cur >= best - 50 && best > 0) {
+            scoreEl.style.color = 'var(--neon-pink)';
+            scoreEl.style.textShadow = '0 0 10px rgba(255,42,109,0.4)';
+            scoreEl.classList.add('near-record-pulse');
+          } else {
+            scoreEl.style.color = '';
+            scoreEl.style.textShadow = '';
+            scoreEl.classList.remove('record-pulse', 'near-record-pulse');
+          }
         }
       }
       // Coins
