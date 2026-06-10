@@ -1696,7 +1696,18 @@ function drawScene(gl, programInfo, deltaTime) {
     }
   }
 
+  // Power-up expiry blink (last 3 seconds)
+  var nowSecs = Date.now() * 0.001;
+  var minRem = 10;
+  if (player.jumping_boots) minRem = Math.min(minRem, 10 - (nowSecs - boots_acquired));
+  if (player.fly_boost) minRem = Math.min(minRem, 10 - (nowSecs - fb_acquired));
+  if (player.hoverboard) minRem = Math.min(minRem, 10 - (nowSecs - hoverboard_acquired));
+  if (minRem < 3 && (player.jumping_boots || player.fly_boost || player.hoverboard)) {
+    var blink = 0.5 + 0.5 * Math.sin(Date.now() * 0.015);
+    gl.uniform1f(programInfo.uniformLocations.uAlpha, blink);
+  }
   player.drawCube(gl, vpMatrix, programInfo, deltaTime);
+  gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
 
   // Afterimages on lane switch
   for (var ai = 0; ai < afterimages.length; ai++) {
