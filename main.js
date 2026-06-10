@@ -67,7 +67,6 @@ var wasInAir = false;
 var greyScale = false;
 var flashing = false;
 var train_speeds = new Array();
-var positions = new Array();
 var player_speed = 0.5;
 var currentFov = 70; // starts wide, narrows during intro dive
 
@@ -88,7 +87,6 @@ var deathTimer = 0;
 var freezeFrame = 0;
 var timeDilation = 1.0;
 
-var cubeRotation = 0;
 var vpMatrix = mat4.create(); // shared view-projection for world-to-screen
 var afterimages = []; // player afterimages on lane switch
 var shockwaves = []; // landing shockwave rings
@@ -702,7 +700,6 @@ function main() {
     envParticles.push({
       pos: [(Math.random()-0.5)*20, Math.random()*8 - 2, -Math.random()*100],
       vel: [(Math.random()-0.5)*0.3, (Math.random()-0.5)*0.1, (Math.random()-0.5)*0.3],
-      baseY: 0,
       phase: Math.random()*Math.PI*2
     });
   }
