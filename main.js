@@ -1375,7 +1375,7 @@ function main() {
               }
               d = new Date();
               boots_acquired = d.getTime() * 0.001;
-              powersCollected += 1; if (navigator.vibrate) navigator.vibrate(20);
+              powersCollected += 1; cameraShake = 0.2; if (navigator.vibrate) navigator.vibrate(20);
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Jump Boots!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
@@ -1411,7 +1411,7 @@ function main() {
               cam_y_target = player.pos[1] + 9;
               d = new Date();
               fb_acquired = d.getTime() * 0.001;
-              powersCollected += 1; if (navigator.vibrate) navigator.vibrate(20);
+              powersCollected += 1; cameraShake = 0.2; if (navigator.vibrate) navigator.vibrate(20);
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Flying Boost!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
@@ -1462,7 +1462,7 @@ function main() {
               }
               d = new Date();
               hoverboard_acquired = d.getTime() * 0.001;
-              powersCollected += 1; if (navigator.vibrate) navigator.vibrate(20);
+              powersCollected += 1; cameraShake = 0.2; if (navigator.vibrate) navigator.vibrate(20);
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Hoverboard!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
