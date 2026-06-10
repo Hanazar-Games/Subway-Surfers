@@ -813,11 +813,19 @@ function main() {
     if (player.tilt > 0) { player.tilt -= 0.02; if (player.tilt < 0) player.tilt = 0; }
     if (player.tilt < 0) { player.tilt += 0.02; if (player.tilt > 0) player.tilt = 0; }
     d = new Date();
-    if (d.getTime() * 0.001 - policeCaughtUp >= 5 && d.getTime() * 0.001 - policeCaughtUp <= 10)
+    var policeTimer = d.getTime() * 0.001 - policeCaughtUp;
+    if (policeTimer >= 5 && policeTimer <= 10)
       police.speedz = player_speed / 2;
     else
       police.speedz = player_speed;
     police.pos[2] -= police.speedz
+    // Police approaching warning (first 5 seconds after obstacle hit)
+    if (policeTimer > 0 && policeTimer < 5 && typeof flashScreen === 'function') {
+      var warnIntensity = 1.0 - policeTimer / 5;
+      if (Math.sin(Date.now() * 0.008) > 0.8) {
+        flashScreen('rgba(255,0,0,' + (warnIntensity * 0.08) + ')', 0.05);
+      }
+    }
 
     // Afterimage on lane switch
     if (typeof playerLastX !== 'undefined' && playerLastX !== player.pos[0]) {
