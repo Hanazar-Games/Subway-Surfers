@@ -1088,6 +1088,7 @@ function main() {
                 showComboText(multiplierStreak + ' combo!', screenX, screenY);
               }
               coins_collected += scoreMultiplier;
+              if (navigator.vibrate) navigator.vibrate(10);
               var streakEl = document.getElementById('hud-streak');
               var streakPanel = document.getElementById('hud-streak-panel');
               if (streakEl && streakPanel) {
