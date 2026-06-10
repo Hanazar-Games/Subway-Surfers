@@ -1326,6 +1326,10 @@ function main() {
               }
               d = new Date();
               boots_acquired = d.getTime() * 0.001;
+              if (typeof showComboText === 'function') {
+                var rect = document.getElementById('glcanvas').getBoundingClientRect();
+                showComboText('Jump Boots!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
+              }
               jump_height = 3;
               jumping = false;
             }
@@ -1357,6 +1361,10 @@ function main() {
               cam_y_target = player.pos[1] + 9;
               d = new Date();
               fb_acquired = d.getTime() * 0.001;
+              if (typeof showComboText === 'function') {
+                var rect = document.getElementById('glcanvas').getBoundingClientRect();
+                showComboText('Flying Boost!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
+              }
               jumping = false;
               // generate coins in air
               var zi = flying_boost[i].pos[2] - 5;
@@ -1403,6 +1411,10 @@ function main() {
               }
               d = new Date();
               hoverboard_acquired = d.getTime() * 0.001;
+              if (typeof showComboText === 'function') {
+                var rect = document.getElementById('glcanvas').getBoundingClientRect();
+                showComboText('Hoverboard!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
+              }
               jumping = false;
             }
           }
