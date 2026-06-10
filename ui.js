@@ -109,6 +109,21 @@ var gamePaused = false;
     if (gameAudio) gameAudio.volume = s.music;
     if (crashAudio) crashAudio.volume = s.sfx;
   }
+  var fadeInterval = null;
+  function fadeAudio(targetVolume, duration) {
+    if (!gameAudio) return;
+    var startVolume = gameAudio.volume || 0;
+    var startTime = Date.now();
+    var endTime = startTime + duration;
+    if (fadeInterval) clearInterval(fadeInterval);
+    fadeInterval = setInterval(function() {
+      var now = Date.now();
+      var t = Math.min(1, (now - startTime) / duration);
+      var vol = startVolume + (targetVolume - startVolume) * t;
+      gameAudio.volume = Math.max(0, Math.min(1, vol));
+      if (t >= 1) clearInterval(fadeInterval);
+    }, 50);
+  }
 
   // ===== Number formatting =====
   function formatNum(n) {
@@ -431,6 +446,9 @@ var gamePaused = false;
           showHUD();
           startHUDUpdate();
           showKeyHint();
+          var s = getAudioSettings();
+          if (gameAudio) { gameAudio.volume = 0; gameAudio.play().catch(function(){}); }
+          fadeAudio(s.music, 1500);
         });
       };
       s.onerror = function () {
@@ -447,7 +465,7 @@ var gamePaused = false;
   window.uiPauseGame = function () {
     if (currentScreen !== 'playing') return;
     gamePaused = true;
-    if (gameAudio) gameAudio.pause();
+    fadeAudio(0.1, 500);
     var flash = document.getElementById('screen-flash');
     if (flash) { flash.style.background = 'rgba(0,0,0,0.4)'; flash.style.opacity = '1'; flash.style.transition = 'opacity 0.3s'; }
     showScreen('pause');
@@ -459,7 +477,8 @@ var gamePaused = false;
     if (flash) { flash.style.opacity = '0'; }
     showScreen('playing');
     showHUD();
-    if (gameAudio) gameAudio.play().catch(function () {});
+    var s = getAudioSettings();
+    fadeAudio(s.music, 500);
     setTimeout(function () {
       gamePaused = false;
     }, 100);
@@ -498,7 +517,7 @@ var gamePaused = false;
     gamePaused = true;
     stopHUDUpdate();
     hideHUD();
-    if (gameAudio) gameAudio.pause();
+    fadeAudio(0, 1000);
 
     var title = $('#result-title');
     var scoreV = $('#result-score');
