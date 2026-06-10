@@ -567,6 +567,7 @@ var gamePaused = false;
       if (typeof flashScreen === 'function') {
         setTimeout(function() { flashScreen('rgba(255,215,0,0.2)', 0.4); }, 200);
       }
+      spawnConfetti();
     }
     // Show achievement unlock toast
     newAchievements.forEach(function (a, i) {
@@ -938,5 +939,20 @@ var gamePaused = false;
     document.body.appendChild(el);
     setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 900);
   };
+
+  function spawnConfetti() {
+    var colors = ['#ff2a6d', '#05d9e8', '#ffd700', '#00ff88', '#ffaa00'];
+    for (var i = 0; i < 40; i++) {
+      var c = document.createElement('div');
+      c.className = 'confetti';
+      c.style.left = Math.random() * 100 + 'vw';
+      c.style.background = colors[Math.floor(Math.random() * colors.length)];
+      c.style.animationDuration = (2 + Math.random() * 2) + 's';
+      c.style.animationDelay = (Math.random() * 0.5) + 's';
+      c.style.transform = 'rotate(' + (Math.random() * 360) + 'deg)';
+      document.body.appendChild(c);
+      setTimeout(function(el) { return function() { if (el.parentNode) el.parentNode.removeChild(el); }; }(c), 4500);
+    }
+  }
 
 })();

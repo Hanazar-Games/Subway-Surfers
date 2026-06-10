@@ -902,6 +902,21 @@ html, body {
   100% { opacity: 0; transform: translate(-50%, -120%) scale(1.0); }
 }
 
+/* Confetti animation for new record */
+.confetti {
+  position: fixed;
+  top: -10px;
+  width: 8px;
+  height: 8px;
+  z-index: 400;
+  pointer-events: none;
+  animation: confetti-fall linear forwards;
+}
+@keyframes confetti-fall {
+  0% { transform: translateY(0) rotate(0deg); opacity: 1; }
+  100% { transform: translateY(100vh) rotate(720deg); opacity: 0; }
+}
+
 /* Record pulse animations */
 @keyframes recordPulse {
   0%, 100% { transform: translate(-50%, -50%) scale(1); }
