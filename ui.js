@@ -694,6 +694,25 @@ var gamePaused = false;
     bindTouch(tJump,  38);
     bindTouch(tDuck,  40);
 
+    // Swipe gesture support (anywhere on screen during gameplay)
+    var touchStartX = 0, touchStartY = 0;
+    var minSwipe = 40;
+    document.addEventListener('touchstart', function(e) {
+      if (currentScreen !== 'playing') return;
+      touchStartX = e.touches[0].clientX;
+      touchStartY = e.touches[0].clientY;
+    }, { passive: true });
+    document.addEventListener('touchend', function(e) {
+      if (currentScreen !== 'playing') return;
+      var dx = e.changedTouches[0].clientX - touchStartX;
+      var dy = e.changedTouches[0].clientY - touchStartY;
+      if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minSwipe) {
+        emitKey(dx > 0 ? 39 : 37);
+      } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > minSwipe) {
+        emitKey(dy > 0 ? 40 : 38);
+      }
+    }, { passive: true });
+
     // ESC to pause/resume
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
