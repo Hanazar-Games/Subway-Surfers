@@ -48,7 +48,7 @@ var glow_cyan_texture, glow_pink_texture, glow_gold_texture;
 // Theme texture caches (preload both themes to avoid runtime reloads)
 var themeTextures = {1: {}, 2: {}};
 
-var cam_x = 0, cam_y = 5, cam_z = 30.0;
+var cam_x = 0, cam_y = 12, cam_z = 40.0;
 var cam_y_target = 5;
 var cam_z_target = 13.0;
 var cameraShake = 0;
@@ -814,9 +814,13 @@ function main() {
 
     // start-of-game camera push-in animation
     if (gameStartAnim) {
-      cam_z += (cam_z_target - cam_z) * 0.03;
+      cam_z += (cam_z_target - cam_z) * 0.025;
+      cam_y += (cam_y_target - cam_y) * 0.04;
+      currentFov += (45 - currentFov) * 0.04;
       if (Math.abs(cam_z - cam_z_target) < 0.1) {
         cam_z = cam_z_target;
+        cam_y = cam_y_target;
+        currentFov = 45;
         gameStartAnim = false;
       }
     }
