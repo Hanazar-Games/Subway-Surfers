@@ -91,6 +91,7 @@ var timeDilation = 1.0;
 var cubeRotation = 0;
 var vpMatrix = mat4.create(); // shared view-projection for world-to-screen
 var afterimages = []; // player afterimages on lane switch
+var shockwaves = []; // landing shockwave rings
 
 // ========== Web Audio SFX ==========
 var audioCtx = null;
@@ -973,6 +974,7 @@ function main() {
                 var vz = (Math.random() - 0.5) * 3.0;
                 particles.push(new Particle(gl, [player.pos[0], -4.2, player.pos[2]], [vx, vy, vz], 0.4 + Math.random() * 0.3, dust_texture));
               }
+              shockwaves.push({ x: player.pos[0], z: player.pos[2], life: 0.4, maxLife: 0.4 });
               // Perfect landing bonus from high fall
               if (player.speedy > 0.15) {
                 coins_collected += 1;
@@ -1015,6 +1017,7 @@ function main() {
                 var vz = (Math.random() - 0.5) * 3.0;
                 particles.push(new Particle(gl, [player.pos[0], -4.2, player.pos[2]], [vx, vy, vz], 0.4 + Math.random() * 0.3, dust_texture));
               }
+              shockwaves.push({ x: player.pos[0], z: player.pos[2], life: 0.4, maxLife: 0.4 });
             }
             player.pos[1] = -4;
             player.speedy = 0.05;
@@ -1510,6 +1513,11 @@ function main() {
       afterimages[ai].life -= deltaTime * timeDilation;
       if (afterimages[ai].life <= 0) afterimages.splice(ai, 1);
     }
+    // Update shockwaves
+    for (var si = shockwaves.length - 1; si >= 0; si--) {
+      shockwaves[si].life -= deltaTime * timeDilation;
+      if (shockwaves[si].life <= 0) shockwaves.splice(si, 1);
+    }
 
     // Trail particles for hoverboard / flying boost
     trailTimer += deltaTime * timeDilation;
@@ -1829,6 +1837,21 @@ function drawScene(gl, programInfo, deltaTime) {
     }
   }
   gl.enable(gl.DEPTH_TEST);
+
+  // Landing shockwaves (expanding rings)
+  if (typeof drawGlow === 'function') {
+    for (var si = 0; si < shockwaves.length; si++) {
+      var sw = shockwaves[si];
+      if (sw.z < cullNear && sw.z > cullFar) {
+        var progress = 1 - sw.life / sw.maxLife;
+        var size = 0.5 + progress * 3.0;
+        var alpha = 1 - progress;
+        gl.uniform1f(programInfo.uniformLocations.uAlpha, alpha * 0.6);
+        drawGlow(gl, vpMatrix, programInfo, glow_cyan_texture, sw.x, -4.8, sw.z, size, size * 0.3);
+      }
+    }
+    gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
+  }
 
   var num_boxes = boxes.length;
   for (var i = 0; i < num_boxes; i++) {
