@@ -936,7 +936,7 @@ var gamePaused = false;
     setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 900);
   };
 
-  function spawnConfetti() {
+  window.spawnConfetti = function() {
     var colors = ['#ff2a6d', '#05d9e8', '#ffd700', '#00ff88', '#ffaa00'];
     for (var i = 0; i < 40; i++) {
       var c = document.createElement('div');

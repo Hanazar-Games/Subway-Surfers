@@ -1478,6 +1478,7 @@ function main() {
       score = -player.pos[2] + coins_collected;
       // Victory celebration
       if (typeof flashScreen === 'function') flashScreen('#ffd700', 0.5);
+      if (typeof spawnConfetti === 'function') spawnConfetti();
       for (var p = 0; p < 40; p++) {
         var angle = Math.random() * Math.PI * 2;
         var speed = 3.0 + Math.random() * 5.0;
