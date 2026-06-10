@@ -85,6 +85,7 @@ var deathTimer = 0;
 var timeDilation = 1.0;
 
 var cubeRotation = 0;
+var vpMatrix = mat4.create(); // shared view-projection for world-to-screen
 
 // ========== Web Audio SFX ==========
 var audioCtx = null;
@@ -1025,7 +1026,23 @@ function main() {
                 showComboText(multiplierStreak + ' combo!', screenX, screenY);
               }
               coins_collected += scoreMultiplier;
+              var streakEl = document.getElementById('hud-streak');
+              var streakPanel = document.getElementById('hud-streak-panel');
+              if (streakEl && streakPanel) {
+                streakEl.textContent = multiplierStreak;
+                streakPanel.style.display = '';
+                streakEl.style.transform = 'scale(1.4)';
+                setTimeout(function() { if (streakEl) streakEl.style.transform = 'scale(1)'; }, 150);
+              }
               playCoinSound();
+              // Score popup at coin position
+              if (typeof showScorePopup === 'function') {
+                var sp = worldToScreen(coins[i].pos[0], coins[i].pos[1], coins[i].pos[2]);
+                if (sp) {
+                  var popupColor = scoreMultiplier >= 3 ? '#ffaa00' : (scoreMultiplier >= 2 ? '#05d9e8' : '#ffd700');
+                  showScorePopup('+' + scoreMultiplier, sp.x, sp.y, popupColor);
+                }
+              }
               // Spawn sparkle particles on coin collect
               for (var p = 0; p < 6; p++) {
                 var vx = (Math.random() - 0.5) * 4.0;
@@ -1379,6 +1396,8 @@ function main() {
     if (nowTime - lastCoinTime >= 2.0 && scoreMultiplier > 1) {
       scoreMultiplier = 1;
       multiplierStreak = 0;
+      var streakPanel = document.getElementById('hud-streak-panel');
+      if (streakPanel) streakPanel.style.display = 'none';
     }
 
     // Trail particles for hoverboard / flying boost
@@ -1497,6 +1516,22 @@ function main() {
   }
 }
 
+function worldToScreen(wx, wy, wz) {
+  var clip = [vpMatrix[0]*wx + vpMatrix[4]*wy + vpMatrix[8]*wz + vpMatrix[12],
+              vpMatrix[1]*wx + vpMatrix[5]*wy + vpMatrix[9]*wz + vpMatrix[13],
+              vpMatrix[2]*wx + vpMatrix[6]*wy + vpMatrix[10]*wz + vpMatrix[14],
+              vpMatrix[3]*wx + vpMatrix[7]*wy + vpMatrix[11]*wz + vpMatrix[15]];
+  if (clip[3] === 0) return null;
+  var ndcX = clip[0] / clip[3];
+  var ndcY = clip[1] / clip[3];
+  var canvas = document.getElementById('glcanvas');
+  if (!canvas) return null;
+  return {
+    x: (ndcX * 0.5 + 0.5) * canvas.clientWidth,
+    y: (-ndcY * 0.5 + 0.5) * canvas.clientHeight
+  };
+}
+
 function drawScene(gl, programInfo, deltaTime) {
 
   if (theme_flag == 1) {
@@ -1544,9 +1579,7 @@ function drawScene(gl, programInfo, deltaTime) {
 
   var viewMatrix = cameraMatrix;
 
-  var viewProjectionMatrix = mat4.create();
-
-  mat4.multiply(viewProjectionMatrix, projectionMatrix, viewMatrix);
+  mat4.multiply(vpMatrix, projectionMatrix, viewMatrix);
 
   // Set fog uniforms (theme-dependent fog color)
   var fogColor = theme == 1 ? [0.56, 0.89, 0.99] : [0.0, 0.0, 0.0];
@@ -1565,9 +1598,9 @@ function drawScene(gl, programInfo, deltaTime) {
   var iStart = Math.max(0, Math.floor(-(cullNear + 5) / 5));
   var iEnd = Math.min(1000, Math.ceil(-(cullFar - 5) / 5));
   for (var i = iStart; i < iEnd; i += 1) {
-    track1[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    track2[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-    track3[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+    track1[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+    track2[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+    track3[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   // Background parallax: city/wall move slower than foreground
@@ -1578,51 +1611,51 @@ function drawScene(gl, programInfo, deltaTime) {
     if (theme == 1) {
       var origZ = city[i].pos[2];
       city[i].pos[2] = origZ - parallaxOffset;
-      city[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      city[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
       city[i].pos[2] = origZ;
     } else if (theme == 2) {
       var origZ = wall[i].pos[2];
       wall[i].pos[2] = origZ - parallaxOffset;
-      wall[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      wall[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
       wall[i].pos[2] = origZ;
     }
   }
 
-  player.drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-  police.drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-  dog.drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+  player.drawCube(gl, vpMatrix, programInfo, deltaTime);
+  police.drawCube(gl, vpMatrix, programInfo, deltaTime);
+  dog.drawCube(gl, vpMatrix, programInfo, deltaTime);
 
   var num_coins = coins.length;
   for (var i = 0; i < num_coins; i++) {
     if (coins[i].exist && coins[i].pos[2] < cullNear && coins[i].pos[2] > cullFar)
-      coins[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      coins[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   // draw particles on top of coins
   for (var i = 0; i < particles.length; i++) {
     if (particles[i].pos[2] < cullNear && particles[i].pos[2] > cullFar)
-      particles[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      particles[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   var num_trains = trainF.length;
   for (var i = 0; i < num_trains; i++) {
     if (trainF[i].pos[2] < cullNear && trainF[i].pos[2] > cullFar) {
-      trainF[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-      trainT[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-      trainL[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-      trainR[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      trainF[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+      trainT[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+      trainL[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+      trainR[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
     }
   }
   for (var i = 0; i < trainExtra.length; i++) {
     if (trainExtra[i].pos[2] < cullNear && trainExtra[i].pos[2] > cullFar)
-      trainExtra[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      trainExtra[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   // Train headlight glows (drawn after opaque geometry with additive blend)
   for (var i = 0; i < num_trains; i++) {
     if (trainF[i].pos[2] < cullNear && trainF[i].pos[2] > cullFar) {
       if (typeof drawGlow === 'function') {
-        drawGlow(gl, viewProjectionMatrix, programInfo, glow_gold_texture,
+        drawGlow(gl, vpMatrix, programInfo, glow_gold_texture,
           trainF[i].pos[0], trainF[i].pos[1] + 1.5, trainF[i].pos[2] + 10, 1.2, 1.2);
       }
     }
@@ -1633,19 +1666,19 @@ function drawScene(gl, programInfo, deltaTime) {
   for (var i = 0; i < num_trains; i++) {
     if (trainF[i].pos[2] < cullNear && trainF[i].pos[2] > cullFar) {
       if (typeof drawShadow === 'function')
-        drawShadow(gl, viewProjectionMatrix, programInfo, trainF[i].pos[0], -5.1, trainF[i].pos[2] - 5, 2.0, 8.0);
+        drawShadow(gl, vpMatrix, programInfo, trainF[i].pos[0], -5.1, trainF[i].pos[2] - 5, 2.0, 8.0);
     }
   }
   for (var i = 0; i < num_boxes; i++) {
     if (boxes[i].pos[2] < cullNear && boxes[i].pos[2] > cullFar) {
       if (typeof drawShadow === 'function')
-        drawShadow(gl, viewProjectionMatrix, programInfo, boxes[i].pos[0], -5.1, boxes[i].pos[2], 1.8, 1.8);
+        drawShadow(gl, vpMatrix, programInfo, boxes[i].pos[0], -5.1, boxes[i].pos[2], 1.8, 1.8);
     }
   }
   for (var i = 0; i < num_manholes; i++) {
     if (manholes[i].pos[2] < cullNear && manholes[i].pos[2] > cullFar) {
       if (typeof drawShadow === 'function')
-        drawShadow(gl, viewProjectionMatrix, programInfo, manholes[i].pos[0], -5.05, manholes[i].pos[2], 1.5, 1.5);
+        drawShadow(gl, vpMatrix, programInfo, manholes[i].pos[0], -5.05, manholes[i].pos[2], 1.5, 1.5);
     }
   }
   gl.enable(gl.DEPTH_TEST);
@@ -1653,54 +1686,54 @@ function drawScene(gl, programInfo, deltaTime) {
   var num_boxes = boxes.length;
   for (var i = 0; i < num_boxes; i++) {
     if (boxes[i].pos[2] < cullNear && boxes[i].pos[2] > cullFar)
-      boxes[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      boxes[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   var num_manholes = manholes.length;
   for (var i = 0; i < num_manholes; i++) {
     if (manholes[i].pos[2] < cullNear && manholes[i].pos[2] > cullFar)
-      manholes[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      manholes[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   var num_high = duck_obs_stop.length;
   for (var i = 0; i < num_high; i++) {
     if (duck_obs_stop[i].pos[2] < cullNear && duck_obs_stop[i].pos[2] > cullFar) {
-      duck_obs_stop[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-      duck_obs_stand1[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-      duck_obs_stand2[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      duck_obs_stop[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+      duck_obs_stand1[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+      duck_obs_stand2[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
     }
   }
 
   var num_low = jump_obs.length;
   for (var i = 0; i < num_low; i++) {
     if (jump_obs[i].pos[2] < cullNear && jump_obs[i].pos[2] > cullFar)
-      jump_obs[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      jump_obs[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   var num_rope = rope_stop.length;
   for (var i = 0; i < num_rope; i++) {
     if (rope_stop[i].pos[2] < cullNear && rope_stop[i].pos[2] > cullFar) {
-      rope_stand1[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-      rope_stand2[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
-      rope_stop[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      rope_stand1[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+      rope_stand2[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+      rope_stop[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
     }
   }
 
   var num_boots = boots.length;
   for (var i = 0; i < num_boots; i++) {
     if (boots[i].exist && boots[i].pos[2] < cullNear && boots[i].pos[2] > cullFar)
-      boots[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      boots[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   var num_boost = flying_boost.length;
   for (var i = 0; i < num_boost; i++) {
     if (flying_boost[i].exist && flying_boost[i].pos[2] < cullNear && flying_boost[i].pos[2] > cullFar)
-      flying_boost[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      flying_boost[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   for (var i = 0; i < 2; i++) {
     if (hoverboard[i].exist && hoverboard[i].pos[2] < cullNear && hoverboard[i].pos[2] > cullFar)
-      hoverboard[i].drawCube(gl, viewProjectionMatrix, programInfo, deltaTime);
+      hoverboard[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   // Ambient dust particles (tiny glowing motes)
@@ -1708,7 +1741,7 @@ function drawScene(gl, programInfo, deltaTime) {
     for (var i = 0; i < envParticles.length; i++) {
       var ep = envParticles[i];
       if (ep.pos[2] < cullNear && ep.pos[2] > cullFar) {
-        drawGlow(gl, viewProjectionMatrix, programInfo, dust_texture,
+        drawGlow(gl, vpMatrix, programInfo, dust_texture,
           ep.pos[0], ep.pos[1], ep.pos[2], 0.04, 0.04);
       }
     }

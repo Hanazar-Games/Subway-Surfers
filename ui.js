@@ -856,4 +856,15 @@ var gamePaused = false;
     setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 1000);
   };
 
+  window.showScorePopup = function(text, x, y, color) {
+    var el = document.createElement('div');
+    el.textContent = text;
+    el.className = 'score-popup';
+    el.style.left = x + 'px';
+    el.style.top = y + 'px';
+    el.style.color = color || 'var(--neon-gold)';
+    document.body.appendChild(el);
+    setTimeout(function() { if (el.parentNode) el.parentNode.removeChild(el); }, 900);
+  };
+
 })();
