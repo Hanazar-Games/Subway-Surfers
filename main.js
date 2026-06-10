@@ -939,6 +939,18 @@ function main() {
                 var vz = (Math.random() - 0.5) * 3.0;
                 particles.push(new Particle(gl, [player.pos[0], -4.2, player.pos[2]], [vx, vy, vz], 0.4 + Math.random() * 0.3, dust_texture));
               }
+              // Perfect landing bonus from high fall
+              if (player.speedy > 0.15) {
+                coins_collected += 1;
+                if (typeof showScorePopup === 'function') {
+                  var sp = worldToScreen(player.pos[0], player.pos[1], player.pos[2]);
+                  if (sp) showScorePopup('+1', sp.x, sp.y, '#ffffff');
+                }
+                if (typeof showComboText === 'function') {
+                  var rect = document.getElementById('glcanvas').getBoundingClientRect();
+                  showComboText('Nice Landing!', rect.left + rect.width / 2, rect.top + rect.height * 0.45);
+                }
+              }
             }
             player.pos[1] = -4;
             player.speedy = 0;
