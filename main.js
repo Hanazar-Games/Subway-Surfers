@@ -87,6 +87,7 @@ var timeDilation = 1.0;
 
 var cubeRotation = 0;
 var vpMatrix = mat4.create(); // shared view-projection for world-to-screen
+var afterimages = []; // player afterimages on lane switch
 
 // ========== Web Audio SFX ==========
 var audioCtx = null;
@@ -352,6 +353,7 @@ function main() {
     uniform highp float uFogNear;
     uniform highp float uFogFar;
     uniform highp float uGlow;
+    uniform highp float uAlpha;
 
     void main(void) {
       highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
@@ -361,7 +363,8 @@ function main() {
       litColor.rgb += texelColor.rgb * uGlow;
 
       highp float fogAmount = smoothstep(uFogNear, uFogFar, vFogDepth);
-      gl_FragColor = mix(litColor, vec4(uFogColor, 1.0), fogAmount);
+      gl_FragColor = mix(litColor, vec4(uFogColor, litColor.a), fogAmount);
+      gl_FragColor.a *= uAlpha;
     }
   `;
 
@@ -375,6 +378,7 @@ function main() {
     uniform highp float uFogNear;
     uniform highp float uFogFar;
     uniform highp float uGlow;
+    uniform highp float uAlpha;
 
     void main(void) {
       highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
@@ -383,7 +387,8 @@ function main() {
       litColor.rgb += texelColor.rrr * uGlow;
 
       highp float fogAmount = smoothstep(uFogNear, uFogFar, vFogDepth);
-      gl_FragColor = mix(litColor, vec4(uFogColor, 1.0), fogAmount);
+      gl_FragColor = mix(litColor, vec4(uFogColor, litColor.a), fogAmount);
+      gl_FragColor.a *= uAlpha;
     }
   `;
 
@@ -450,6 +455,7 @@ function main() {
       uFogNear: gl.getUniformLocation(shaderProgram, 'uFogNear'),
       uFogFar: gl.getUniformLocation(shaderProgram, 'uFogFar'),
       uGlow: gl.getUniformLocation(shaderProgram, 'uGlow'),
+      uAlpha: gl.getUniformLocation(shaderProgram, 'uAlpha'),
     },
   };
 
@@ -468,6 +474,7 @@ function main() {
       uFogColor: gl.getUniformLocation(shaderProgrambw, 'uFogColor'),
       uFogNear: gl.getUniformLocation(shaderProgrambw, 'uFogNear'),
       uFogFar: gl.getUniformLocation(shaderProgrambw, 'uFogFar'),
+      uAlpha: gl.getUniformLocation(shaderProgrambw, 'uAlpha'),
     },
   };
 
@@ -486,6 +493,7 @@ function main() {
       uFogColor: gl.getUniformLocation(shaderProgramhigh, 'uFogColor'),
       uFogNear: gl.getUniformLocation(shaderProgramhigh, 'uFogNear'),
       uFogFar: gl.getUniformLocation(shaderProgramhigh, 'uFogFar'),
+      uAlpha: gl.getUniformLocation(shaderProgramhigh, 'uAlpha'),
     },
   };
 
@@ -800,6 +808,19 @@ function main() {
     else
       police.speedz = player_speed;
     police.pos[2] -= police.speedz
+
+    // Afterimage on lane switch
+    if (typeof playerLastX !== 'undefined' && playerLastX !== player.pos[0]) {
+      afterimages.push({
+        x: playerLastX,
+        y: player.pos[1],
+        z: player.pos[2],
+        life: 0.25,
+        maxLife: 0.25,
+        tilt: player.tilt
+      });
+    }
+    var playerLastX = player.pos[0];
 
     if (player.pos[0] > 6)
       player.pos[0] = 6;
@@ -1407,6 +1428,12 @@ function main() {
       streakBar.style.width = (rem / 2.0 * 100) + '%';
     }
 
+    // Update afterimages
+    for (var ai = afterimages.length - 1; ai >= 0; ai--) {
+      afterimages[ai].life -= deltaTime * timeDilation;
+      if (afterimages[ai].life <= 0) afterimages.splice(ai, 1);
+    }
+
     // Trail particles for hoverboard / flying boost
     trailTimer += deltaTime * timeDilation;
     if (trailTimer > 0.05) {
@@ -1598,6 +1625,7 @@ function drawScene(gl, programInfo, deltaTime) {
   gl.uniform1f(programInfo.uniformLocations.uFogNear, 25.0);
   gl.uniform1f(programInfo.uniformLocations.uFogFar, 90.0);
   gl.uniform1f(programInfo.uniformLocations.uGlow, theme == 2 ? 0.35 : 0.0);
+  gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
 
   // Distance-based culling bounds
   var cullNear = cam_z + 8;
@@ -1631,6 +1659,28 @@ function drawScene(gl, programInfo, deltaTime) {
   }
 
   player.drawCube(gl, vpMatrix, programInfo, deltaTime);
+
+  // Afterimages on lane switch
+  for (var ai = 0; ai < afterimages.length; ai++) {
+    var aimg = afterimages[ai];
+    var alpha = aimg.life / aimg.maxLife * 0.5;
+    gl.uniform1f(programInfo.uniformLocations.uAlpha, alpha);
+    var origX = player.pos[0];
+    var origY = player.pos[1];
+    var origZ = player.pos[2];
+    var origTilt = player.tilt;
+    player.pos[0] = aimg.x;
+    player.pos[1] = aimg.y;
+    player.pos[2] = aimg.z;
+    player.tilt = aimg.tilt;
+    player.drawCube(gl, vpMatrix, programInfo, deltaTime);
+    player.pos[0] = origX;
+    player.pos[1] = origY;
+    player.pos[2] = origZ;
+    player.tilt = origTilt;
+  }
+  gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
+
   police.drawCube(gl, vpMatrix, programInfo, deltaTime);
   dog.drawCube(gl, vpMatrix, programInfo, deltaTime);
 

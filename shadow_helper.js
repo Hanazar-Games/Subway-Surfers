@@ -96,6 +96,49 @@ function drawShadow(gl, projectionMatrix, programInfo, x, y, z, sx, sz) {
     gl.disable(gl.BLEND);
 }
 
+// Draw a textured sprite with standard alpha blending.
+function drawSprite(gl, projectionMatrix, programInfo, texture, x, y, z, sx, sy, alpha) {
+    ensureShadowResources(gl);
+
+    const modelViewMatrix = mat4.create();
+    mat4.translate(modelViewMatrix, modelViewMatrix, [x, y, z]);
+    mat4.scale(modelViewMatrix, modelViewMatrix, [sx * 2, sy * 2, 1]);
+
+    const normalMatrix = mat4.create();
+    mat4.invert(normalMatrix, modelViewMatrix);
+    mat4.transpose(normalMatrix, normalMatrix);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, shadowPositionBuffer);
+    gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, shadowTextureCoordBuffer);
+    gl.vertexAttribPointer(programInfo.attribLocations.textureCoord, 2, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo.attribLocations.textureCoord);
+
+    gl.bindBuffer(gl.ARRAY_BUFFER, shadowNormalBuffer);
+    gl.vertexAttribPointer(programInfo.attribLocations.vertexNormal, 3, gl.FLOAT, false, 0, 0);
+    gl.enableVertexAttribArray(programInfo.attribLocations.vertexNormal);
+
+    gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, shadowIndexBuffer);
+
+    gl.useProgram(programInfo.program);
+    gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
+    gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+    gl.uniformMatrix4fv(programInfo.uniformLocations.normalMatrix, false, normalMatrix);
+
+    gl.activeTexture(gl.TEXTURE0);
+    gl.bindTexture(gl.TEXTURE_2D, texture);
+    gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
+
+    gl.enable(gl.BLEND);
+    gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+    gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
+
+    gl.disable(gl.BLEND);
+}
+
 // Draw a glowing sprite (additive blend) at position.
 function drawGlow(gl, projectionMatrix, programInfo, texture, x, y, z, sx, sy) {
     ensureShadowResources(gl);
