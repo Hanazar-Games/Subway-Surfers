@@ -656,14 +656,10 @@ var gamePaused = false;
     if (btnShare) btnShare.onclick = function () {
       playClick();
       var text = 'I scored ' + formatNum(Math.floor(score || 0)) + ' in Subway Surfers! 🎮';
+      var url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text);
+      window.open(url, '_blank', 'width=600,height=400');
       if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).then(function () {
-          btnShare.textContent = '✅ Copied!';
-          setTimeout(function () { btnShare.textContent = '📋 Copy Score'; }, 1500);
-        });
-      } else {
-        btnShare.textContent = '❌ Failed';
-        setTimeout(function () { btnShare.textContent = '📋 Copy Score'; }, 1500);
+        navigator.clipboard.writeText(text).catch(function(){});
       }
     };
     if (pauseVol) {
