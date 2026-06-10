@@ -405,23 +405,21 @@ var gamePaused = false;
   }
 
   // ===== Button click sound =====
-  var clickAudio = null;
+  var clickCtx = null;
   function playClick() {
-    if (!clickAudio) {
-      clickAudio = new Audio();
-      // Simple synthesized click using Web Audio API
-      try {
-        var ctx = new (window.AudioContext || window.webkitAudioContext)();
-        var osc = ctx.createOscillator();
-        var gain = ctx.createGain();
-        osc.connect(gain);
-        gain.connect(ctx.destination);
-        osc.frequency.value = 800;
-        gain.gain.setValueAtTime(0.08, ctx.currentTime);
-        gain.gain.exponentialRampToValueAtTime(0.001, ctx.currentTime + 0.08);
-        osc.start(ctx.currentTime);
-        osc.stop(ctx.currentTime + 0.08);
-      } catch (e) {}
+    try {
+      if (!clickCtx) clickCtx = new (window.AudioContext || window.webkitAudioContext)();
+      if (clickCtx.state === 'suspended') clickCtx.resume();
+      var osc = clickCtx.createOscillator();
+      var gain = clickCtx.createGain();
+      osc.connect(gain);
+      gain.connect(clickCtx.destination);
+      osc.frequency.value = 800;
+      gain.gain.setValueAtTime(0.08, clickCtx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.001, clickCtx.currentTime + 0.08);
+      osc.start(clickCtx.currentTime);
+      osc.stop(clickCtx.currentTime + 0.08);
+    } catch (e) {}
     }
   }
 
@@ -528,6 +526,7 @@ var gamePaused = false;
     stopHUDUpdate();
     hideHUD();
     fadeAudio(0, 1000, function() { if (gameAudio) gameAudio.pause(); });
+    if (typeof updateTrainRumble === 'function') updateTrainRumble(0);
 
     var title = $('#result-title');
     var scoreV = $('#result-score');
@@ -663,6 +662,9 @@ var gamePaused = false;
       if (navigator.clipboard) {
         navigator.clipboard.writeText(text).catch(function(){});
       }
+      var origText = btnShare.textContent;
+      btnShare.textContent = '✅ Shared!';
+      setTimeout(function() { btnShare.textContent = origText; }, 1500);
     };
     if (pauseVol) {
       var s = getAudioSettings();

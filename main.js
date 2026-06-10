@@ -720,10 +720,18 @@ function main() {
     if (deltaTime > 0.1) deltaTime = 0.1; // cap to prevent tab-inactive jumps
     then = now;
 
+    // Select shader program
+    var activeProgram = programInfo;
+    if (greyScale) activeProgram = programInfobw;
+    else if (flashing) {
+      d = new Date();
+      if (Math.floor(d.getTime() * 0.001 - flash_start_time) % 2 != 0) activeProgram = programInfohigh;
+    }
+
     // Freeze frame on death impact (render but don't update)
     if (freezeFrame > 0) {
       freezeFrame--;
-      drawScene(gl, programInfo, 0);
+      drawScene(gl, activeProgram, 0);
       requestAnimationFrame(render);
       return;
     }
@@ -1610,21 +1618,7 @@ function main() {
       if (cameraShake < 0.02) cameraShake = 0;
     }
 
-    if (greyScale) {
-      drawScene(gl, programInfobw, deltaTime);
-    }
-    else if (flashing) {
-      d = new Date();
-      if (Math.floor(d.getTime() * 0.001 - flash_start_time) % 2 == 0) {
-        drawScene(gl, programInfo, deltaTime);
-      }
-      else {
-        drawScene(gl, programInfohigh, deltaTime);
-      }
-    }
-    else {
-      drawScene(gl, programInfo, deltaTime);
-    }
+    drawScene(gl, activeProgram, deltaTime);
 
     // restore camera position after shake
     cam_x = origCamX;
