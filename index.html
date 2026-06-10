@@ -269,7 +269,21 @@
   <div id="pause-overlay" class="ui-overlay hidden">
     <div class="glass-card">
       <div class="game-logo-small">Paused</div>
-      <div class="menu-buttons" style="margin-top: 28px;">
+      <div class="pause-stats" style="display:flex; gap:20px; justify-content:center; margin-top:16px; opacity:0.8;">
+        <div style="text-align:center;">
+          <div style="font-size:20px; font-weight:700; color:#fff;" id="pause-score">0</div>
+          <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Score</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:20px; font-weight:700; color:var(--neon-gold);" id="pause-coins">0</div>
+          <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Coins</div>
+        </div>
+        <div style="text-align:center;">
+          <div style="font-size:20px; font-weight:700; color:#fff;" id="pause-dist">0m</div>
+          <div style="font-size:10px; color:var(--text-muted); text-transform:uppercase; letter-spacing:1px;">Distance</div>
+        </div>
+      </div>
+      <div class="menu-buttons" style="margin-top: 20px;">
         <button id="btn-resume" class="btn btn-cyan">▶ Resume</button>
         <button id="btn-restart-pause" class="btn btn-outline">↻ Restart</button>
         <button id="btn-menu-pause" class="btn btn-outline">🏠 Main Menu</button>

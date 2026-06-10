@@ -469,6 +469,13 @@ var gamePaused = false;
     fadeAudio(0.1, 500);
     var flash = document.getElementById('screen-flash');
     if (flash) { flash.style.background = 'rgba(0,0,0,0.4)'; flash.style.opacity = '1'; flash.style.transition = 'opacity 0.3s'; }
+    // Update pause stats
+    var pScore = $('#pause-score');
+    var pCoins = $('#pause-coins');
+    var pDist = $('#pause-dist');
+    if (pScore) pScore.textContent = typeof score !== 'undefined' ? formatNum(Math.floor(score)) : '0';
+    if (pCoins) pCoins.textContent = typeof coins_collected !== 'undefined' ? coins_collected : '0';
+    if (pDist) pDist.textContent = (typeof player !== 'undefined' ? Math.floor(-player.pos[2]) : '0') + 'm';
     showScreen('pause');
   };
 
