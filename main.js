@@ -69,6 +69,7 @@ var flashing = false;
 var train_speeds = new Array();
 var positions = new Array();
 var player_speed = 0.5;
+var currentFov = 45;
 
 var score = 0;
 var coins_collected = 0;
@@ -1564,7 +1565,9 @@ function drawScene(gl, programInfo, deltaTime) {
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  const fieldOfView = 45 * Math.PI / 180;
+  var targetFov = 45 + Math.min(1, (player_speed - 0.5) / 0.5) * 12;
+  currentFov += (targetFov - currentFov) * 0.05;
+  const fieldOfView = currentFov * Math.PI / 180;
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
   const zNear = 0.1;
   const zFar = 100.0;
