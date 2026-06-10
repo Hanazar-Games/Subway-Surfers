@@ -75,6 +75,8 @@ var score = 0;
 var coins_collected = 0;
 var scoreMultiplier = 1;
 var multiplierStreak = 0;
+var bestStreak = 0;
+var powersCollected = 0;
 var lastCoinTime = 0;
 var trailTimer = 0;
 var sparkTimer = 0;
@@ -1051,6 +1053,7 @@ function main() {
               } else {
                 multiplierStreak = 1;
               }
+              if (multiplierStreak > bestStreak) bestStreak = multiplierStreak;
               lastCoinTime = now;
               if (multiplierStreak >= 20) scoreMultiplier = 3;
               else if (multiplierStreak >= 10) scoreMultiplier = 2;
@@ -1334,6 +1337,7 @@ function main() {
               }
               d = new Date();
               boots_acquired = d.getTime() * 0.001;
+              powersCollected += 1;
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Jump Boots!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
@@ -1369,6 +1373,7 @@ function main() {
               cam_y_target = player.pos[1] + 9;
               d = new Date();
               fb_acquired = d.getTime() * 0.001;
+              powersCollected += 1;
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Flying Boost!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
@@ -1419,6 +1424,7 @@ function main() {
               }
               d = new Date();
               hoverboard_acquired = d.getTime() * 0.001;
+              powersCollected += 1;
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Hoverboard!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);

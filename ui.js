@@ -505,6 +505,9 @@ var gamePaused = false;
     var coinV = $('#result-coins');
     var bestWrap = $('#result-best-wrap');
     var bestV = $('#result-best');
+    var distV = $('#result-dist');
+    var streakV = $('#result-streak');
+    var powersV = $('#result-powers');
 
     if (title) {
       title.textContent = won ? 'YOU WON!' : 'GAME OVER';
@@ -512,6 +515,9 @@ var gamePaused = false;
     }
     if (scoreV) scoreV.textContent = formatNum(Math.floor(finalScore));
     if (coinV) coinV.textContent = finalCoins;
+    if (distV) distV.textContent = (typeof score !== 'undefined' ? Math.floor(-player.pos[2]) : 0) + 'm';
+    if (streakV) streakV.textContent = typeof bestStreak !== 'undefined' ? bestStreak : 0;
+    if (powersV) powersV.textContent = typeof powersCollected !== 'undefined' ? powersCollected : 0;
 
     var isNewBest = setHighScore(finalScore);
     var newAchievements = updateStats(won, finalScore, finalCoins);
