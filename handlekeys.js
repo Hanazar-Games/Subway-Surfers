@@ -4,6 +4,7 @@ var gameReady = false;
 
 // 显式声明 key，避免隐式全局变量
 var key;
+var d, flash_start_time;
 
 document.addEventListener(
     "keydown",
@@ -63,7 +64,7 @@ document.addEventListener(
             if (flashing == false) {
                 flashing = true;
                 greyScale = false;
-                d = new Date();
+                var d = new Date();
                 flash_start_time = d.getTime() * 0.001;
             }
             else
@@ -75,7 +76,7 @@ document.addEventListener(
                 flashing = false;
             }
             else
-                greyScale = false
+                greyScale = false;
         }
     },
     false

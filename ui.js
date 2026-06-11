@@ -83,6 +83,8 @@ var gamePaused = false;
         void numEl.offsetWidth;
         numEl.style.animation = '';
         if (typeof flashScreen === 'function') flashScreen('rgba(5,217,232,0.25)', 0.3);
+        clearInterval(countdownTimer);
+        countdownTimer = null;
         setTimeout(function () {
           overlay.style.display = 'none';
           if (cb) cb();
@@ -90,6 +92,7 @@ var gamePaused = false;
       }
     };
 
+    if (countdownTimer) clearInterval(countdownTimer);
     countdownTimer = setInterval(tick, 800);
   }
 

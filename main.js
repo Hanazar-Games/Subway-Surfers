@@ -90,6 +90,7 @@ var timeDilation = 1.0;
 var vpMatrix = mat4.create(); // shared view-projection for world-to-screen
 var afterimages = []; // player afterimages on lane switch
 var shockwaves = []; // landing shockwave rings
+var playerLastX = null; // track player X for afterimage spawning
 
 // Cached DOM refs (updated once on init)
 var _distFill = null, _distText = null, _streakBar = null, _streakPanel = null, _streakEl = null;
@@ -635,7 +636,7 @@ function main() {
     else
       x = 6;
     y = 0;
-    z = -i * 61 - 30
+    z = -i * 61 - 30;
     duck_obs_stop.push(new Stop(gl, [x, y, z], 7, 3, 0.1));
     duck_obs_stand1.push(new Stand(gl, [x + 1.5, y - 2, z], 6, 0.2, 0.1));
     duck_obs_stand2.push(new Stand(gl, [x - 1.5, y - 2, z], 6, 0.2, 0.1));
@@ -858,7 +859,7 @@ function main() {
     }
 
     // Afterimage on lane switch
-    if (typeof playerLastX !== 'undefined' && playerLastX !== player.pos[0]) {
+    if (playerLastX !== null && playerLastX !== player.pos[0]) {
       afterimages.push({
         x: playerLastX,
         y: player.pos[1],
@@ -868,7 +869,7 @@ function main() {
         tilt: player.tilt
       });
     }
-    var playerLastX = player.pos[0];
+    playerLastX = player.pos[0];
 
     if (player.pos[0] > 6)
       player.pos[0] = 6;
@@ -964,8 +965,8 @@ function main() {
             }
           }
           // jump onto box
-          n = boxes.length;
-          for (var i = 0; i < n; i++) {
+          var numBoxes = boxes.length;
+          for (var i = 0; i < numBoxes; i++) {
             if (player.pos[0] == boxes[i].pos[0]) {
               if (player.pos[1] <= boxes[i].pos[1] + 3.5) {
                 if (player.pos[2] <= boxes[i].pos[2] + 3.5 && player.pos[2] >= boxes[i].pos[2] - 3.5) {
@@ -1441,9 +1442,9 @@ function main() {
                 if (c == 10) {
                   c = 0;
                   if (xc == -6)
-                    xc = 0
+                    xc = 0;
                   else if (xc == 0)
-                    xc = 6
+                    xc = 6;
                   else if (xc == 6)
                     xc = -6;
                 }
@@ -1711,6 +1712,11 @@ function drawScene(gl, programInfo, deltaTime) {
   var cullNear = cam_z + 8;
   var cullFar = cam_z - 95;
 
+  // Pre-compute object counts for culling loops
+  var num_trains = trainF.length;
+  var num_boxes = boxes.length;
+  var num_manholes = manholes.length;
+
   // Compute visible track range (tracks at z = -i * 5)
   var iStart = Math.max(0, Math.floor(-(cullNear + 5) / 5));
   var iEnd = Math.min(1000, Math.ceil(-(cullFar - 5) / 5));
@@ -1787,7 +1793,6 @@ function drawScene(gl, programInfo, deltaTime) {
       particles[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
-  var num_trains = trainF.length;
   for (var i = 0; i < num_trains; i++) {
     if (trainF[i].pos[2] < cullNear && trainF[i].pos[2] > cullFar) {
       trainF[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
@@ -1848,13 +1853,11 @@ function drawScene(gl, programInfo, deltaTime) {
     gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
   }
 
-  var num_boxes = boxes.length;
   for (var i = 0; i < num_boxes; i++) {
     if (boxes[i].pos[2] < cullNear && boxes[i].pos[2] > cullFar)
       boxes[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
-  var num_manholes = manholes.length;
   for (var i = 0; i < num_manholes; i++) {
     if (manholes[i].pos[2] < cullNear && manholes[i].pos[2] > cullFar)
       manholes[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
