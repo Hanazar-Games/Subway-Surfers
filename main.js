@@ -87,6 +87,7 @@ var deathTimer = 0;
 var freezeFrame = 0;
 var timeDilation = 1.0;
 
+var cubeRotation = 0;
 var vpMatrix = mat4.create(); // shared view-projection for world-to-screen
 var afterimages = []; // player afterimages on lane switch
 var shockwaves = []; // landing shockwave rings
@@ -99,14 +100,37 @@ var _distFill = null, _distText = null, _streakBar = null, _streakPanel = null, 
 var audioCtx = null;
 var sfxMasterGain = null;
 
+function hasUserActivation() {
+    return !navigator.userActivation || navigator.userActivation.hasBeenActive;
+}
+
+function safeVibrate(pattern) {
+    if (navigator.vibrate && hasUserActivation()) {
+        navigator.vibrate(pattern);
+    }
+}
+
 function initSfx() {
     if (audioCtx) return;
+    if (!hasUserActivation()) return;
     var AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
     audioCtx = new AudioContext();
     sfxMasterGain = audioCtx.createGain();
-    sfxMasterGain.gain.value = 0.4;
+    var storedVolume = 0.5;
+    try {
+        var raw = localStorage.getItem('ss_audio');
+        if (raw) storedVolume = JSON.parse(raw).sfx;
+    } catch (e) {}
+    sfxMasterGain.gain.value = Math.max(0, Math.min(1, storedVolume)) * 0.8;
     sfxMasterGain.connect(audioCtx.destination);
+}
+
+function setSfxVolume(volume) {
+    var safeVolume = Math.max(0, Math.min(1, Number(volume) || 0));
+    if (sfxMasterGain) {
+        sfxMasterGain.gain.value = safeVolume * 0.8;
+    }
 }
 
 function resumeSfx() {
@@ -255,6 +279,19 @@ function applyTheme(t) {
   dog_texture = themeTextures[t].dog;
 }
 
+function resetGameStartTiming() {
+  d = new Date();
+  startTime = d.getTime() * 0.001;
+  policeCaughtUp = startTime;
+}
+
+function keepOpeningLaneSafe(x, z) {
+  if (z > -75 && x === -6) {
+    return Math.random() < 0.5 ? 0 : 6;
+  }
+  return x;
+}
+
 main();
 
 function main() {
@@ -265,19 +302,6 @@ function main() {
     _streakBar = document.getElementById('streak-bar');
     _streakPanel = document.getElementById('hud-streak-panel');
     _streakEl = document.getElementById('hud-streak');
-
-    var musicEl = document.getElementById('music');
-    if (musicEl) {
-      musicEl.volume = 0;
-      musicEl.play();
-      var fadeIn = setInterval(function() {
-        if (musicEl.volume < 0.5) {
-          musicEl.volume = Math.min(0.5, musicEl.volume + 0.02);
-        } else {
-          clearInterval(fadeIn);
-        }
-      }, 100);
-    }
 
     const canvas = document.querySelector('#glcanvas');
     const gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
@@ -489,6 +513,7 @@ function main() {
       uFogColor: gl.getUniformLocation(shaderProgrambw, 'uFogColor'),
       uFogNear: gl.getUniformLocation(shaderProgrambw, 'uFogNear'),
       uFogFar: gl.getUniformLocation(shaderProgrambw, 'uFogFar'),
+      uGlow: gl.getUniformLocation(shaderProgrambw, 'uGlow'),
       uAlpha: gl.getUniformLocation(shaderProgrambw, 'uAlpha'),
     },
   };
@@ -508,6 +533,7 @@ function main() {
       uFogColor: gl.getUniformLocation(shaderProgramhigh, 'uFogColor'),
       uFogNear: gl.getUniformLocation(shaderProgramhigh, 'uFogNear'),
       uFogFar: gl.getUniformLocation(shaderProgramhigh, 'uFogFar'),
+      uGlow: gl.getUniformLocation(shaderProgramhigh, 'uGlow'),
       uAlpha: gl.getUniformLocation(shaderProgramhigh, 'uAlpha'),
     },
   };
@@ -562,6 +588,7 @@ function main() {
       x = 6;
     y = -4;
     z = - (i + 1) * 79;
+    x = keepOpeningLaneSafe(x, z);
     // Train body: front, top, left, right, bottom, back panels
     trainF.push(new Train(gl, [x, y, z + 10], 10, 3, 0.1));
     trainT.push(new Train(gl, [x, y + 5, z], 0.1, 3, 20));
@@ -608,6 +635,7 @@ function main() {
       x = 6;
     y = -3.4;
     z = - i * 73 - 40;
+    x = keepOpeningLaneSafe(x, z);
     // Box obstacle (more crate-like proportions)
     boxes.push(new Box(gl, [x, y, z], 3.5, 4.5, 5));
   }
@@ -637,6 +665,7 @@ function main() {
       x = 6;
     y = 0;
     z = -i * 61 - 30;
+    x = keepOpeningLaneSafe(x, z);
     duck_obs_stop.push(new Stop(gl, [x, y, z], 7, 3, 0.1));
     duck_obs_stand1.push(new Stand(gl, [x + 1.5, y - 2, z], 6, 0.2, 0.1));
     duck_obs_stand2.push(new Stand(gl, [x - 1.5, y - 2, z], 6, 0.2, 0.1));
@@ -653,6 +682,7 @@ function main() {
       x = 6;
     y = -3;
     z = -(i + 1) * 53;
+    x = keepOpeningLaneSafe(x, z);
     jump_obs.push(new Stop(gl, [x, y, z], 3, 3, 1));
   }
 
@@ -754,6 +784,7 @@ function main() {
 
     // Difficulty scaling: speed slowly increases with distance
     var distance = -player.pos[2];
+    score = distance + coins_collected;
     player_speed = 0.5 + Math.min(0.5, distance / 3000);
     // Update distance progress bar
     if (_distFill && _distText) {
@@ -1107,7 +1138,7 @@ function main() {
                 if (scoreMultiplier >= 3) {
                   if (typeof flashScreen === 'function') flashScreen('#ffd700', 0.4);
                   cameraShake = 0.5;
-                  if (navigator.vibrate) navigator.vibrate([20, 30, 20]);
+                  safeVibrate([20, 30, 20]);
                   // Extra burst particles for x3
                   for (var pb = 0; pb < 16; pb++) {
                     var pbx = (Math.random() - 0.5) * 6.0;
@@ -1125,7 +1156,7 @@ function main() {
                 showComboText(multiplierStreak + ' combo!', screenX, screenY);
               }
               coins_collected += scoreMultiplier;
-              if (navigator.vibrate) navigator.vibrate(10);
+              safeVibrate(10);
               if (_streakEl && _streakPanel) {
                 _streakEl.textContent = multiplierStreak;
                 _streakPanel.style.display = '';
@@ -1169,7 +1200,7 @@ function main() {
             if (player.pos[2] >= trainF[i].pos[2] - 18 && player.pos[2] <= trainF[i].pos[2]) {
               if (dying) break;
               score = -player.pos[2] + coins_collected;
-              cameraShake = 0.8; if (navigator.vibrate) navigator.vibrate(100);
+              cameraShake = 0.8; safeVibrate(100);
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
               for (var p = 0; p < 20; p++) {
@@ -1215,7 +1246,7 @@ function main() {
             if (player.pos[2] <= boxes[i].pos[2] + 3 && player.pos[2] >= boxes[i].pos[2] - 3) {
               if (dying) break;
               score = -player.pos[2] + coins_collected;
-              cameraShake = 0.8; if (navigator.vibrate) navigator.vibrate(100);
+              cameraShake = 0.8; safeVibrate(100);
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
               for (var p = 0; p < 20; p++) {
@@ -1241,7 +1272,7 @@ function main() {
             if (player.pos[2] <= manholes[i].pos[2] + 2.3 && player.pos[2] >= manholes[i].pos[2] - 2.3) {
               if (dying) break;
               score = -player.pos[2] + coins_collected;
-              cameraShake = 0.8; if (navigator.vibrate) navigator.vibrate(100);
+              cameraShake = 0.8; safeVibrate(100);
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
               for (var p = 0; p < 20; p++) {
@@ -1271,7 +1302,7 @@ function main() {
                   if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
                 }
                 else {
-                  cameraShake = 0.3; if (navigator.vibrate) navigator.vibrate(30);
+                  cameraShake = 0.3; safeVibrate(30);
                   playBumpSound();
                   if (typeof flashScreen === 'function') flashScreen('#ff8800', 0.15);
                   obstacle_hit = i;
@@ -1298,7 +1329,7 @@ function main() {
                   if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
                 }
                 else {
-                  cameraShake = 0.3; if (navigator.vibrate) navigator.vibrate(30);
+                  cameraShake = 0.3; safeVibrate(30);
                   playBumpSound();
                   if (typeof flashScreen === 'function') flashScreen('#ff8800', 0.15);
                   obstacle_hit = i;
@@ -1324,7 +1355,7 @@ function main() {
                 if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
               }
               else {
-                cameraShake = 0.3; if (navigator.vibrate) navigator.vibrate(30);
+                cameraShake = 0.3; safeVibrate(30);
                 playBumpSound();
                 obstacle_hit = i;
                 player.speedz = player_speed / 2;
@@ -1390,7 +1421,7 @@ function main() {
               }
               d = new Date();
               boots_acquired = d.getTime() * 0.001;
-              powersCollected += 1; cameraShake = 0.2; if (navigator.vibrate) navigator.vibrate(20);
+              powersCollected += 1; cameraShake = 0.2; safeVibrate(20);
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Jump Boots!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
@@ -1426,7 +1457,7 @@ function main() {
               cam_y_target = player.pos[1] + 9;
               d = new Date();
               fb_acquired = d.getTime() * 0.001;
-              powersCollected += 1; cameraShake = 0.2; if (navigator.vibrate) navigator.vibrate(20);
+              powersCollected += 1; cameraShake = 0.2; safeVibrate(20);
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Flying Boost!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
@@ -1477,7 +1508,7 @@ function main() {
               }
               d = new Date();
               hoverboard_acquired = d.getTime() * 0.001;
-              powersCollected += 1; cameraShake = 0.2; if (navigator.vibrate) navigator.vibrate(20);
+              powersCollected += 1; cameraShake = 0.2; safeVibrate(20);
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Hoverboard!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
@@ -1641,9 +1672,10 @@ function worldToScreen(wx, wy, wz) {
   var ndcY = clip[1] / clip[3];
   var canvas = document.getElementById('glcanvas');
   if (!canvas) return null;
+  var rect = canvas.getBoundingClientRect();
   return {
-    x: (ndcX * 0.5 + 0.5) * canvas.clientWidth,
-    y: (-ndcY * 0.5 + 0.5) * canvas.clientHeight
+    x: rect.left + (ndcX * 0.5 + 0.5) * rect.width,
+    y: rect.top + (-ndcY * 0.5 + 0.5) * rect.height
   };
 }
 
@@ -1952,10 +1984,23 @@ function loadTexture(gl, url) {
   const image = new Image();
   image.onload = function () {
     gl.bindTexture(gl.TEXTURE_2D, texture);
+    var source = image;
+    var uploadWidth = image.width;
+    var uploadHeight = image.height;
+    try {
+      var canvas = document.createElement('canvas');
+      canvas.width = image.width;
+      canvas.height = image.height;
+      var ctx = canvas.getContext('2d');
+      ctx.drawImage(image, 0, 0);
+      source = canvas;
+      uploadWidth = canvas.width;
+      uploadHeight = canvas.height;
+    } catch (e) {}
     gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-      srcFormat, srcType, image);
+      srcFormat, srcType, source);
 
-    if (isPowerOf2(image.width) && isPowerOf2(image.height)) {
+    if (isPowerOf2(uploadWidth) && isPowerOf2(uploadHeight)) {
       gl.generateMipmap(gl.TEXTURE_2D);
     } else {
       gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);

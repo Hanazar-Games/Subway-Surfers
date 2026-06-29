@@ -13,6 +13,9 @@ document.addEventListener(
         if (!gameReady) {
             return;
         }
+        if (typeof gamePaused !== 'undefined' && gamePaused) {
+            return;
+        }
         key = event.keyCode;
         // 阻止方向键和空格滚动页面
         if ([32, 37, 38, 39, 40].indexOf(key) !== -1) {

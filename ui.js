@@ -5,13 +5,13 @@
  */
 
 // Global pause flag - used by main.js render loop
-var gamePaused = false;
+var gamePaused = true;
 
 (function () {
   'use strict';
 
   // ===== State =====
-  var currentScreen = 'start';   // 'start' | 'playing' | 'paused' | 'gameover' | 'howto' | 'settings'
+  var currentScreen = 'start';   // 'start' | 'playing' | 'paused' | 'gameover' | 'howto' | 'stats' | 'settings'
   var gameAudio = null;
   var crashAudio = null;
   var hudInterval = null;
@@ -24,6 +24,7 @@ var gamePaused = false;
   var screens = {
     start:    $('#start-screen'),
     howto:    $('#howto-screen'),
+    stats:    $('#stats-screen'),
     settings: $('#settings-screen'),
     pause:    $('#pause-overlay'),
     gameover: $('#gameover-overlay'),
@@ -43,20 +44,28 @@ var gamePaused = false;
   }
 
   function showHUD() {
+    screens.hud.classList.remove('hidden');
     screens.hud.classList.add('visible');
     var hs = $('#hud-highscore');
     if (hs) hs.classList.add('visible');
     var tc = $('#touch-controls');
-    if (tc) tc.classList.add('visible');
+    if (tc) {
+      tc.classList.remove('hidden');
+      tc.classList.add('visible');
+    }
     var db = $('#distance-bar');
     if (db) db.classList.add('visible');
   }
   function hideHUD() {
     screens.hud.classList.remove('visible');
+    screens.hud.classList.add('hidden');
     var hs = $('#hud-highscore');
     if (hs) hs.classList.remove('visible');
     var tc = $('#touch-controls');
-    if (tc) tc.classList.remove('visible');
+    if (tc) {
+      tc.classList.remove('visible');
+      tc.classList.add('hidden');
+    }
     var db = $('#distance-bar');
     if (db) db.classList.remove('visible');
   }
@@ -111,6 +120,7 @@ var gamePaused = false;
     crashAudio = document.getElementById('crash');
     if (gameAudio) gameAudio.volume = s.music;
     if (crashAudio) crashAudio.volume = s.sfx;
+    if (typeof setSfxVolume === 'function') setSfxVolume(s.sfx);
   }
   var fadeInterval = null;
   function fadeAudio(targetVolume, duration, onDone) {
@@ -409,7 +419,11 @@ var gamePaused = false;
 
   // ===== Button click sound =====
   var clickCtx = null;
+  function hasUserActivation() {
+    return !navigator.userActivation || navigator.userActivation.hasBeenActive;
+  }
   function playClick() {
+    if (!hasUserActivation()) return;
     try {
       if (!clickCtx) clickCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (clickCtx.state === 'suspended') clickCtx.resume();
@@ -423,7 +437,6 @@ var gamePaused = false;
       osc.start(clickCtx.currentTime);
       osc.stop(clickCtx.currentTime + 0.08);
     } catch (e) {}
-    }
   }
 
   // ===== Public: Start Game =====
@@ -442,10 +455,13 @@ var gamePaused = false;
     function startPlay() {
       if (loading) loading.classList.add('hidden');
       showScreen('playing');
+      gamePaused = true;
       runCountdown(function () {
         showHUD();
         startHUDUpdate();
         showKeyHint();
+        if (typeof resetGameStartTiming === 'function') resetGameStartTiming();
+        gamePaused = false;
         var s = getAudioSettings();
         if (gameAudio) { gameAudio.volume = 0; gameAudio.play().catch(function(){}); }
         fadeAudio(s.music, 1500);
@@ -479,6 +495,7 @@ var gamePaused = false;
     if (pScore) pScore.textContent = typeof score !== 'undefined' ? formatNum(Math.floor(score)) : '0';
     if (pCoins) pCoins.textContent = typeof coins_collected !== 'undefined' ? coins_collected : '0';
     if (pDist) pDist.textContent = (typeof player !== 'undefined' ? Math.floor(-player.pos[2]) : '0') + 'm';
+    hideHUD();
     showScreen('pause');
   };
 
