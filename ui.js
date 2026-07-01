@@ -20,6 +20,7 @@ window.gamePaused = true;
   var countdownFallbackTimer = null;
   var countdownActive = false;
   var gameLaunching = false;
+  var resumePending = false;
   var pauseStartedAt = 0;
   var themeFlashTimer = null;
   var scorePopTimer = null;
@@ -548,7 +549,9 @@ window.gamePaused = true;
   window.uiPauseGame = function () {
     if (currentScreen !== 'playing') return;
     if (countdownActive) return;
+    if (resumePending) return;
     setPaused(true);
+    resumePending = false;
     pauseStartedAt = Date.now() * 0.001;
     stopHUDUpdate();
     fadeAudio(0.1, 500);
@@ -569,6 +572,9 @@ window.gamePaused = true;
 
   // ===== Public: Resume =====
   window.uiResumeGame = function () {
+    if (currentScreen !== 'pause') return;
+    if (resumePending) return;
+    resumePending = true;
     var flash = document.getElementById('screen-flash');
     if (flash) { flash.style.opacity = '0'; }
     showScreen('playing');
@@ -586,6 +592,7 @@ window.gamePaused = true;
     startHUDUpdate();
     setTimeout(function () {
       setPaused(false);
+      resumePending = false;
     }, 100);
   };
 
@@ -621,6 +628,7 @@ window.gamePaused = true;
   window.uiGameOver = function (won, finalScore, finalCoins) {
     setPaused(true);
     gameLaunching = false;
+    resumePending = false;
     countdownActive = false;
     if (countdownTimer) {
       clearInterval(countdownTimer);
@@ -880,7 +888,7 @@ window.gamePaused = true;
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         if (currentScreen === 'playing') uiPauseGame();
-        else if (currentScreen === 'paused') uiResumeGame();
+        else if (currentScreen === 'pause') uiResumeGame();
       }
       if ((e.key === 'Enter' || e.key === ' ') && currentScreen === 'gameover') {
         uiRestartGame();

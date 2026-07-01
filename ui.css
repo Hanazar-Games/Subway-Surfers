@@ -732,8 +732,8 @@ html, body {
   border-color: rgba(255,42,109,0.4);
   transform: scale(0.92);
 }
-/* Hide touch controls on devices with fine pointer (mouse) */
-@media (pointer: fine) {
+/* Hide touch controls only on mouse-first desktop devices. */
+@media (hover: hover) and (pointer: fine) and (min-width: 769px) {
   .touch-controls { display: none !important; }
 }
 
