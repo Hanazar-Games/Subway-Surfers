@@ -13,7 +13,7 @@ document.addEventListener(
         if (!gameReady) {
             return;
         }
-        if (typeof gamePaused !== 'undefined' && gamePaused) {
+        if (window.gamePaused) {
             return;
         }
         key = event.keyCode;

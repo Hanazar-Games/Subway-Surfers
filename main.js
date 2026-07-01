@@ -286,7 +286,7 @@ function resetGameStartTiming() {
 }
 
 function keepOpeningLaneSafe(x, z) {
-  if (z > -75 && x === -6) {
+  if (z > -320 && x === -6) {
     return Math.random() < 0.5 ? 0 : 6;
   }
   return x;
@@ -739,7 +739,7 @@ function main() {
 
   function render(now) {
     if (typeof uiUpdateFPS === 'function') uiUpdateFPS();
-    if (gamePaused) {
+    if (window.gamePaused) {
       requestAnimationFrame(render);
       return;
     }

@@ -6,6 +6,7 @@
 
 // Global pause flag - used by main.js render loop
 var gamePaused = true;
+window.gamePaused = true;
 
 (function () {
   'use strict';
@@ -16,11 +17,19 @@ var gamePaused = true;
   var crashAudio = null;
   var hudInterval = null;
   var countdownTimer = null;
+  var countdownFallbackTimer = null;
+  var countdownActive = false;
+  var gameLaunching = false;
+  var pauseStartedAt = 0;
   var themeFlashTimer = null;
   var scorePopTimer = null;
 
   // ===== DOM refs =====
   var $ = function (sel) { return document.querySelector(sel); };
+  function setPaused(value) {
+    gamePaused = !!value;
+    window.gamePaused = gamePaused;
+  }
   var screens = {
     start:    $('#start-screen'),
     howto:    $('#howto-screen'),
@@ -74,9 +83,29 @@ var gamePaused = true;
   function runCountdown(cb) {
     var overlay = $('#countdown-overlay');
     var numEl = $('#countdown-number');
+    if (!overlay || !numEl) {
+      if (cb) cb();
+      return;
+    }
     var count = 3;
+    countdownActive = true;
     overlay.style.display = 'flex';
     numEl.textContent = count;
+
+    function finishCountdown() {
+      if (!countdownActive) return;
+      countdownActive = false;
+      if (countdownTimer) {
+        clearInterval(countdownTimer);
+        countdownTimer = null;
+      }
+      if (countdownFallbackTimer) {
+        clearTimeout(countdownFallbackTimer);
+        countdownFallbackTimer = null;
+      }
+      overlay.style.display = 'none';
+      if (cb) cb();
+    }
 
     var tick = function () {
       count--;
@@ -95,24 +124,50 @@ var gamePaused = true;
         clearInterval(countdownTimer);
         countdownTimer = null;
         setTimeout(function () {
-          overlay.style.display = 'none';
-          if (cb) cb();
+          finishCountdown();
         }, 600);
       }
     };
 
     if (countdownTimer) clearInterval(countdownTimer);
+    if (countdownFallbackTimer) clearTimeout(countdownFallbackTimer);
     countdownTimer = setInterval(tick, 800);
+    countdownFallbackTimer = setTimeout(finishCountdown, 3600);
   }
 
   // ===== Audio System =====
+  function clamp01(v, fallback) {
+    var n = Number(v);
+    if (!isFinite(n)) n = fallback;
+    return Math.max(0, Math.min(1, n));
+  }
   function getAudioSettings() {
     var raw = localStorage.getItem('ss_audio');
     if (!raw) return { music: 0.5, sfx: 0.5 };
-    try { return JSON.parse(raw); } catch (e) { return { music: 0.5, sfx: 0.5 }; }
+    try {
+      var parsed = JSON.parse(raw);
+      return {
+        music: clamp01(parsed.music, 0.5),
+        sfx: clamp01(parsed.sfx, 0.5)
+      };
+    } catch (e) { return { music: 0.5, sfx: 0.5 }; }
   }
   function saveAudioSettings(obj) {
-    localStorage.setItem('ss_audio', JSON.stringify(obj));
+    var safe = {
+      music: clamp01(obj.music, 0.5),
+      sfx: clamp01(obj.sfx, 0.5)
+    };
+    localStorage.setItem('ss_audio', JSON.stringify(safe));
+  }
+  function setSliderValue(slider, label, value) {
+    if (slider) slider.value = Math.round(value * 100);
+    if (label) label.textContent = Math.round(value * 100) + '%';
+  }
+  function syncAudioControls() {
+    var s = getAudioSettings();
+    setSliderValue($('#volume-music'), $('#volume-music-value'), s.music);
+    setSliderValue($('#volume-sfx'), $('#volume-sfx-value'), s.sfx);
+    setSliderValue($('#pause-volume'), null, s.music);
   }
   function applyAudio() {
     var s = getAudioSettings();
@@ -121,6 +176,7 @@ var gamePaused = true;
     if (gameAudio) gameAudio.volume = s.music;
     if (crashAudio) crashAudio.volume = s.sfx;
     if (typeof setSfxVolume === 'function') setSfxVolume(s.sfx);
+    syncAudioControls();
   }
   var fadeInterval = null;
   function fadeAudio(targetVolume, duration, onDone) {
@@ -424,6 +480,8 @@ var gamePaused = true;
   }
   function playClick() {
     if (!hasUserActivation()) return;
+    var settings = getAudioSettings();
+    if (settings.sfx <= 0) return;
     try {
       if (!clickCtx) clickCtx = new (window.AudioContext || window.webkitAudioContext)();
       if (clickCtx.state === 'suspended') clickCtx.resume();
@@ -432,7 +490,7 @@ var gamePaused = true;
       osc.connect(gain);
       gain.connect(clickCtx.destination);
       osc.frequency.value = 800;
-      gain.gain.setValueAtTime(0.08, clickCtx.currentTime);
+      gain.gain.setValueAtTime(0.08 * settings.sfx, clickCtx.currentTime);
       gain.gain.exponentialRampToValueAtTime(0.001, clickCtx.currentTime + 0.08);
       osc.start(clickCtx.currentTime);
       osc.stop(clickCtx.currentTime + 0.08);
@@ -441,10 +499,13 @@ var gamePaused = true;
 
   // ===== Public: Start Game =====
   window.uiStartGame = function () {
+    if (gameLaunching || currentScreen === 'playing') return;
+    gameLaunching = true;
     // Check WebGL support before loading game
     var canvas = document.getElementById('glcanvas');
     var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     if (!gl) {
+      gameLaunching = false;
       showScreen('webgl-error');
       return;
     }
@@ -453,15 +514,16 @@ var gamePaused = true;
     if (loading) loading.classList.remove('hidden');
 
     function startPlay() {
+      gameLaunching = false;
       if (loading) loading.classList.add('hidden');
       showScreen('playing');
-      gamePaused = true;
+      setPaused(true);
       runCountdown(function () {
         showHUD();
         startHUDUpdate();
         showKeyHint();
         if (typeof resetGameStartTiming === 'function') resetGameStartTiming();
-        gamePaused = false;
+        setPaused(false);
         var s = getAudioSettings();
         if (gameAudio) { gameAudio.volume = 0; gameAudio.play().catch(function(){}); }
         fadeAudio(s.music, 1500);
@@ -472,6 +534,7 @@ var gamePaused = true;
       s.src = './main.js';
       s.onload = startPlay;
       s.onerror = function () {
+        gameLaunching = false;
         if (loading) loading.classList.add('hidden');
         alert('Failed to load game. Please refresh and try again.');
       };
@@ -484,8 +547,12 @@ var gamePaused = true;
   // ===== Public: Pause =====
   window.uiPauseGame = function () {
     if (currentScreen !== 'playing') return;
-    gamePaused = true;
+    if (countdownActive) return;
+    setPaused(true);
+    pauseStartedAt = Date.now() * 0.001;
+    stopHUDUpdate();
     fadeAudio(0.1, 500);
+    if (typeof updateTrainRumble === 'function') updateTrainRumble(0);
     var flash = document.getElementById('screen-flash');
     if (flash) { flash.style.background = 'rgba(0,0,0,0.4)'; flash.style.opacity = '1'; flash.style.transition = 'opacity 0.3s'; }
     // Update pause stats
@@ -495,6 +562,7 @@ var gamePaused = true;
     if (pScore) pScore.textContent = typeof score !== 'undefined' ? formatNum(Math.floor(score)) : '0';
     if (pCoins) pCoins.textContent = typeof coins_collected !== 'undefined' ? coins_collected : '0';
     if (pDist) pDist.textContent = (typeof player !== 'undefined' ? Math.floor(-player.pos[2]) : '0') + 'm';
+    syncAudioControls();
     hideHUD();
     showScreen('pause');
   };
@@ -505,10 +573,19 @@ var gamePaused = true;
     if (flash) { flash.style.opacity = '0'; }
     showScreen('playing');
     showHUD();
+    if (pauseStartedAt) {
+      var pausedFor = Date.now() * 0.001 - pauseStartedAt;
+      ['startTime', 'policeCaughtUp', 'obstacle_hit_time', 'boots_acquired', 'fb_acquired', 'hoverboard_acquired', 'flash_start_time'].forEach(function (name) {
+        if (typeof window[name] === 'number' && isFinite(window[name])) window[name] += pausedFor;
+      });
+      pauseStartedAt = 0;
+    }
     var s = getAudioSettings();
+    if (gameAudio && gameAudio.paused && s.music > 0) gameAudio.play().catch(function(){});
     fadeAudio(s.music, 500);
+    startHUDUpdate();
     setTimeout(function () {
-      gamePaused = false;
+      setPaused(false);
     }, 100);
   };
 
@@ -542,7 +619,17 @@ var gamePaused = true;
 
   // ===== Public: Game Over =====
   window.uiGameOver = function (won, finalScore, finalCoins) {
-    gamePaused = true;
+    setPaused(true);
+    gameLaunching = false;
+    countdownActive = false;
+    if (countdownTimer) {
+      clearInterval(countdownTimer);
+      countdownTimer = null;
+    }
+    if (countdownFallbackTimer) {
+      clearTimeout(countdownFallbackTimer);
+      countdownFallbackTimer = null;
+    }
     stopHUDUpdate();
     hideHUD();
     fadeAudio(0, 1000, function() { if (gameAudio) gameAudio.pause(); });
@@ -687,9 +774,8 @@ var gamePaused = true;
       setTimeout(function() { btnShare.textContent = origText; }, 1500);
     };
     if (pauseVol) {
-      var s = getAudioSettings();
-      pauseVol.value = s.music * 100;
       pauseVol.oninput = function () {
+        var s = getAudioSettings();
         s.music = pauseVol.value / 100;
         saveAudioSettings(s);
         applyAudio();
@@ -697,25 +783,20 @@ var gamePaused = true;
     }
 
     // Audio sliders
-    var s = getAudioSettings();
     if (volMusic) {
-      volMusic.value = s.music * 100;
-      if (volMusicVal) volMusicVal.textContent = Math.round(volMusic.value) + '%';
       volMusic.oninput = function () {
+        var s = getAudioSettings();
         s.music = volMusic.value / 100;
         saveAudioSettings(s);
         applyAudio();
-        if (volMusicVal) volMusicVal.textContent = Math.round(volMusic.value) + '%';
       };
     }
     if (volSfx) {
-      volSfx.value = s.sfx * 100;
-      if (volSfxVal) volSfxVal.textContent = Math.round(volSfx.value) + '%';
       volSfx.oninput = function () {
+        var s = getAudioSettings();
         s.sfx = volSfx.value / 100;
         saveAudioSettings(s);
         applyAudio();
-        if (volSfxVal) volSfxVal.textContent = Math.round(volSfx.value) + '%';
       };
     }
 
@@ -743,7 +824,9 @@ var gamePaused = true;
     var tRight = $('#touch-right');
     var tJump = $('#touch-jump');
     var tDuck = $('#touch-duck');
+    var lastTouchEmit = 0;
     function emitKey(code) {
+      if (currentScreen !== 'playing' || countdownActive) return;
       var ev = new KeyboardEvent('keydown', { bubbles: true });
       Object.defineProperty(ev, 'keyCode', { value: code });
       document.dispatchEvent(ev);
@@ -755,9 +838,19 @@ var gamePaused = true;
     }
     function bindTouch(el, code) {
       if (!el) return;
-      var handler = function (e) { e.preventDefault(); emitKey(code); };
-      el.addEventListener('pointerdown', handler, { passive: false });
-      el.addEventListener('touchstart', handler, { passive: false });
+      var handler = function (e) {
+        e.preventDefault();
+        var now = Date.now();
+        if (now - lastTouchEmit < 90) return;
+        lastTouchEmit = now;
+        emitKey(code);
+      };
+      if (window.PointerEvent) {
+        el.addEventListener('pointerdown', handler, { passive: false });
+      } else {
+        el.addEventListener('touchstart', handler, { passive: false });
+        el.addEventListener('mousedown', handler, { passive: false });
+      }
     }
     bindTouch(tLeft,  37);
     bindTouch(tRight, 39);
@@ -816,6 +909,7 @@ var gamePaused = true;
     });
 
     applyAudio();
+    syncAudioControls();
     updateHighScoreDisplay();
   });
 

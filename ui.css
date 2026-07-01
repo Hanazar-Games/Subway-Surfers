@@ -37,6 +37,7 @@ html, body {
   color: var(--text-primary);
   overflow: hidden;
   -webkit-font-smoothing: antialiased;
+  overscroll-behavior: none;
 }
 
 /* ===== Game Container ===== */
@@ -60,6 +61,7 @@ html, body {
   z-index: 200;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   background: var(--bg-primary);
   transition: opacity 0.5s var(--transition-normal), visibility 0.5s;
 }
@@ -73,6 +75,7 @@ html, body {
   z-index: 300;
   display: flex; flex-direction: column;
   align-items: center; justify-content: center;
+  padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   background: rgba(7, 7, 12, 0.85);
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
@@ -105,6 +108,7 @@ html, body {
     inset 0 1px 0 rgba(255,255,255,0.04);
   position: relative;
   overflow: hidden;
+  max-height: calc(100vh - 32px);
 }
 .glass-card::before {
   content: '';
@@ -691,7 +695,7 @@ html, body {
 
 /* ===== Touch Controls ===== */
 .touch-controls {
-  position: fixed; bottom: 20px; left: 0; right: 0;
+  position: fixed; bottom: max(20px, env(safe-area-inset-bottom)); left: 0; right: 0;
   z-index: 152;
   display: flex; justify-content: center;
   opacity: 0;
@@ -901,6 +905,7 @@ html, body {
     min-width: 0;
     width: calc(100vw - 32px);
     padding: 28px 20px !important;
+    overflow-y: auto;
   }
   .game-logo {
     font-size: 42px;
@@ -925,6 +930,25 @@ html, body {
     bottom: 110px;
     gap: 10px;
     padding: 10px 12px;
+    max-width: calc(100vw - 24px);
+    flex-wrap: wrap;
+    justify-content: center;
+  }
+  .hud-top {
+    align-items: flex-start;
+    gap: 8px;
+  }
+  .hud-left {
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .hud-panel {
+    min-width: 76px;
+    padding: 8px 10px;
+  }
+  .touch-btn {
+    width: 58px;
+    height: 58px;
   }
 }
 
