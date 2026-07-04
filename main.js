@@ -82,6 +82,7 @@ var sparkTimer = 0;
 var lastMilestone = 0;
 var nearMissTimer = 0;
 var envParticles = []; // ambient floating dust
+var hazardMarkers = [];
 var dying = false;
 var deathTimer = 0;
 var freezeFrame = 0;
@@ -290,6 +291,22 @@ function keepOpeningLaneSafe(x, z) {
     return Math.random() < 0.5 ? 0 : 6;
   }
   return x;
+}
+
+function laneFromRandom() {
+  var j = Math.floor(Math.random() * 3);
+  if (j == 0) return -6;
+  if (j == 1) return 0;
+  return 6;
+}
+
+function addHazardMarker(x, z, type) {
+  hazardMarkers.push({
+    x: x,
+    z: z,
+    type: type || 'danger',
+    pulse: Math.random() * Math.PI * 2
+  });
 }
 
 main();
@@ -557,38 +574,31 @@ function main() {
   dog.speedz = player_speed;
 
   for (var i = 0; i < 50; i++) {
-    var j = Math.floor(Math.random() * 3);
     var x, y, z;
-    if (j == 0)
-      x = -6;
-    else if (j == 1)
-      x = 0;
-    else
-      x = 6;
+    x = laneFromRandom();
     y = -4;
     if (i == 0)
       z = -30;
     else
       z = coins[coins.length - 1].pos[2] - (Math.random() * 30 - 15);
     var num_coins = Math.floor(Math.random() * 5 + 5);
+    var pattern = Math.floor(Math.random() * 3);
     for (var k = 0; k < num_coins; k++) {
-      coins.push(new Coin(gl, [x, y, z]));
+      var coinY = y;
+      if (pattern == 1) coinY = y + Math.sin(k / Math.max(1, num_coins - 1) * Math.PI) * 2.4;
+      else if (pattern == 2 && k % 3 == 1) coinY = y + 1.4;
+      coins.push(new Coin(gl, [x, coinY, z]));
       z -= 2.5;
     }
   }
 
   for (var i = 0; i < 10; i++) {
     var x, y, z;
-    var j = Math.floor(Math.random() * 3);
-    if (j == 0)
-      x = -6;
-    else if (j == 1)
-      x = 0;
-    else
-      x = 6;
+    x = laneFromRandom();
     y = -4;
     z = - (i + 1) * 79;
     x = keepOpeningLaneSafe(x, z);
+    addHazardMarker(x, z + 18, 'train');
     // Train body: front, top, left, right, bottom, back panels
     trainF.push(new Train(gl, [x, y, z + 10], 10, 3, 0.1));
     trainT.push(new Train(gl, [x, y + 5, z], 0.1, 3, 20));
@@ -626,46 +636,32 @@ function main() {
 
   for (var i = 0; i < 10; i++) {
     var x, y, z;
-    var j = Math.floor(Math.random() * 3);
-    if (j == 0)
-      x = -6;
-    else if (j == 1)
-      x = 0;
-    else
-      x = 6;
+    x = laneFromRandom();
     y = -3.4;
     z = - i * 73 - 40;
     x = keepOpeningLaneSafe(x, z);
+    addHazardMarker(x, z + 8, 'box');
     // Box obstacle (more crate-like proportions)
     boxes.push(new Box(gl, [x, y, z], 3.5, 4.5, 5));
   }
 
   for (var i = 0; i < 10; i++) {
     var x, y, z;
-    var j = Math.floor(Math.random() * 3);
-    if (j == 0)
-      x = -6;
-    else if (j == 1)
-      x = 0;
-    else
-      x = 6;
+    x = laneFromRandom();
     y = -5.1;
     z = - (i + 1) * 151;
+    x = keepOpeningLaneSafe(x, z);
+    addHazardMarker(x, z + 8, 'gap');
     manholes.push(new Manhole(gl, [x, y, z], 0.6, 4, 4));
   }
 
   for (var i = 0; i < 20; i++) {
     var x, y, z;
-    var j = Math.floor(Math.random() * 3);
-    if (j == 0)
-      x = -6;
-    else if (j == 1)
-      x = 0;
-    else
-      x = 6;
+    x = laneFromRandom();
     y = 0;
     z = -i * 61 - 30;
     x = keepOpeningLaneSafe(x, z);
+    addHazardMarker(x, z + 7, 'duck');
     duck_obs_stop.push(new Stop(gl, [x, y, z], 7, 3, 0.1));
     duck_obs_stand1.push(new Stand(gl, [x + 1.5, y - 2, z], 6, 0.2, 0.1));
     duck_obs_stand2.push(new Stand(gl, [x - 1.5, y - 2, z], 6, 0.2, 0.1));
@@ -673,16 +669,11 @@ function main() {
 
   for (var i = 0; i < 20; i++) {
     var x, y, z;
-    var j = Math.floor(Math.random() * 3);
-    if (j == 0)
-      x = -6;
-    else if (j == 1)
-      x = 0;
-    else
-      x = 6;
+    x = laneFromRandom();
     y = -3;
     z = -(i + 1) * 53;
     x = keepOpeningLaneSafe(x, z);
+    addHazardMarker(x, z + 7, 'jump');
     jump_obs.push(new Stop(gl, [x, y, z], 3, 3, 1));
   }
 
@@ -690,6 +681,7 @@ function main() {
     var x, y, z;
     y = -3.5;
     z = -(i + 1) * 127;
+    addHazardMarker(0, z + 8, 'rope');
     rope_stand1.push(new Stand(gl, [-8, y - 1, z], 2, 0.4, 0.1));
     rope_stand2.push(new Stand(gl, [8, y - 1, z], 2, 0.4, 0.1));
     rope_stop.push(new Stop(gl, [0, y, z], 0.3, 16, 0.1));
@@ -697,13 +689,7 @@ function main() {
 
   for (var i = 0; i < 5; i++) {
     var x, y, z;
-    var j = Math.floor(Math.random() * 3);
-    if (j == 0)
-      x = -6;
-    else if (j == 1)
-      x = 0;
-    else
-      x = 6;
+    x = laneFromRandom();
     y = 0;
     z = -(i + 1) * 103;
     boots.push(new Boots(gl, [x, y, z], 1.5, 1.5, 1.5));
@@ -711,13 +697,7 @@ function main() {
 
   for (var i = 0; i < 5; i++) {
     var x, y, z;
-    var j = Math.floor(Math.random() * 3);
-    if (j == 0)
-      x = -6;
-    else if (j == 1)
-      x = 0;
-    else
-      x = 6;
+    x = laneFromRandom();
     y = 0;
     z = -i * 157 - 60;
     flying_boost.push(new FlyingBoost(gl, [x, y, z], 1.5, 1.5, 1.5));
@@ -856,7 +836,7 @@ function main() {
     // smooth camera vertical follow
     var camDiff = cam_y_target - cam_y;
     cam_y += camDiff * 0.08;
-    target_y = cam_y - 5;
+    target_y = cam_y - 7.2;
 
     // start-of-game camera push-in animation
     if (gameStartAnim) {
@@ -1774,6 +1754,24 @@ function drawScene(gl, programInfo, deltaTime) {
       wall[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
       wall[i].pos[2] = origZ;
     }
+  }
+
+  // Ground warning decals improve obstacle readability at high speed.
+  if (typeof drawGlow === 'function') {
+    for (var hm = 0; hm < hazardMarkers.length; hm++) {
+      var mark = hazardMarkers[hm];
+      if (mark.z < cullNear && mark.z > cullFar) {
+        var distToPlayer = Math.abs(mark.z - player.pos[2]);
+        var pulse = 0.35 + 0.25 * Math.sin(Date.now() * 0.008 + mark.pulse);
+        var alpha = Math.max(0.12, Math.min(0.55, pulse + (40 - Math.min(40, distToPlayer)) * 0.006));
+        var tex = mark.type === 'jump' || mark.type === 'duck' ? glow_cyan_texture : glow_pink_texture;
+        if (mark.type === 'train') tex = glow_gold_texture;
+        var width = mark.type === 'rope' ? 4.5 : 1.15;
+        gl.uniform1f(programInfo.uniformLocations.uAlpha, alpha);
+        drawGlow(gl, vpMatrix, programInfo, tex, mark.x, -4.88, mark.z, width, 0.45);
+      }
+    }
+    gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
   }
 
   // Power-up expiry blink (last 3 seconds)

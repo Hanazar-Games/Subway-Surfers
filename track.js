@@ -9,25 +9,63 @@ let Track = class {
         this.positionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
         this.positions = [
-            // Front face
+            // Running surface
             -3.0, -5.0, 5.0,
             3.0, -5.0, 5.0,
             3.0, -5.0, -5.0,
             -3.0, -5.0, -5.0,
+            // Left rail strip
+            -1.18, -4.94, 5.0,
+            -0.92, -4.94, 5.0,
+            -0.92, -4.94, -5.0,
+            -1.18, -4.94, -5.0,
+            // Right rail strip
+            0.92, -4.94, 5.0,
+            1.18, -4.94, 5.0,
+            1.18, -4.94, -5.0,
+            0.92, -4.94, -5.0,
+            // Raised cross ties
+            -2.45, -4.91, 2.75,
+            2.45, -4.91, 2.75,
+            2.45, -4.91, 2.20,
+            -2.45, -4.91, 2.20,
+            -2.45, -4.91, -2.20,
+            2.45, -4.91, -2.20,
+            2.45, -4.91, -2.75,
+            -2.45, -4.91, -2.75,
         ];
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
 
         const indexBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
         const indices = [
-            0, 1, 2, 0, 2, 3, // front
+            0, 1, 2, 0, 2, 3,
+            4, 5, 6, 4, 6, 7,
+            8, 9, 10, 8, 10, 11,
+            12, 13, 14, 12, 14, 15,
+            16, 17, 18, 16, 18, 19,
         ];
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, new Uint16Array(indices), gl.STATIC_DRAW);
 
         const textureCoordBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
         const textureCoordinates = [
-            // Front
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
             0.0, 0.0,
             1.0, 0.0,
             1.0, 1.0,
@@ -38,7 +76,22 @@ let Track = class {
         const normalBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
         const vertexNormals = [
-            // Top
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
+            0.0, 1.0, 0.0,
             0.0, 1.0, 0.0,
             0.0, 1.0, 0.0,
             0.0, 1.0, 0.0,
@@ -147,7 +200,7 @@ let Track = class {
         gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
 
         {
-            const vertexCount = 6;
+            const vertexCount = 30;
             const type = gl.UNSIGNED_SHORT;
             const offset = 0;
             gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);

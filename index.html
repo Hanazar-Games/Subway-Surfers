@@ -425,7 +425,7 @@
         splash.innerHTML = '';
       }
       var start = document.getElementById('start-screen');
-      if (start) start.classList.remove('hidden');
+      if (start && !window.ssGameStarted) start.classList.remove('hidden');
     }, splashDuration);
   </script>
 

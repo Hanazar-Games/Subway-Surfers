@@ -120,10 +120,10 @@ let Player = class {
             1.0, 0.0, 0.0,
             1.0, 0.0, 0.0,
             // Left
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0
+            -1.0, 0.0, 0.0,
+            -1.0, 0.0, 0.0,
+            -1.0, 0.0, 0.0,
+            -1.0, 0.0, 0.0
         ];
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals), gl.STATIC_DRAW);
 
@@ -238,6 +238,33 @@ let Player = class {
             textureCoord: headTextureCoordBuffer,
             indices: headIndexBuffer,
         };
+    }
+
+    bindBodyBuffers(gl, programInfo) {
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer.position);
+        gl.vertexAttribPointer(programInfo.attribLocations.vertexPosition, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(programInfo.attribLocations.vertexPosition);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer.textureCoord);
+        gl.vertexAttribPointer(programInfo.attribLocations.textureCoord, 2, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(programInfo.attribLocations.textureCoord);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.buffer.normal);
+        gl.vertexAttribPointer(programInfo.attribLocations.vertexNormal, 3, gl.FLOAT, false, 0, 0);
+        gl.enableVertexAttribArray(programInfo.attribLocations.vertexNormal);
+        gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, this.buffer.indices);
+    }
+
+    drawBodyPart(gl, projectionMatrix, programInfo, baseMatrix, offset, scale, rotation, axis) {
+        const partMatrix = mat4.clone(baseMatrix);
+        mat4.translate(partMatrix, partMatrix, offset);
+        if (rotation) mat4.rotate(partMatrix, partMatrix, rotation, axis || [1, 0, 0]);
+        mat4.scale(partMatrix, partMatrix, scale);
+        const normalMatrix = mat4.create();
+        mat4.invert(normalMatrix, partMatrix);
+        mat4.transpose(normalMatrix, normalMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, partMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.normalMatrix, false, normalMatrix);
+        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
     }
 
     drawCube(gl, projectionMatrix, programInfo, deltaTime) {
@@ -357,7 +384,31 @@ let Player = class {
             gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
         }
 
+        // ========== DRAW LIMBS / ACCESSORIES ==========
+        this.bindBodyBuffers(gl, programInfo);
+        var stride = Math.sin(t * 1.55) * 0.45 * runFactor;
+        var armSwing = stride;
+        var legSwing = -stride;
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [-0.62, 0.15, 0.02], [0.28, 0.45, 0.45], armSwing, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0.62, 0.15, 0.02], [0.28, 0.45, 0.45], -armSwing, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [-0.22, -1.32, 0.02], [0.28, 0.38, 0.38], legSwing, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0.22, -1.32, 0.02], [0.28, 0.38, 0.38], -legSwing, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0, 0.1, -0.42], [0.55, 0.55, 0.32], 0, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0, 1.48, 0.18], [0.55, 0.08, 0.45], 0, [1, 0, 0]);
+
         // ========== DRAW HEAD ==========
+        gl.uniformMatrix4fv(
+            programInfo.uniformLocations.projectionMatrix,
+            false,
+            projectionMatrix);
+        gl.uniformMatrix4fv(
+            programInfo.uniformLocations.modelViewMatrix,
+            false,
+            modelViewMatrix);
+        gl.uniformMatrix4fv(
+            programInfo.uniformLocations.normalMatrix,
+            false,
+            normalMatrix);
         {
             const numComponents = 3;
             gl.bindBuffer(gl.ARRAY_BUFFER, this.headBuffer.position);

@@ -7,6 +7,7 @@
 // Global pause flag - used by main.js render loop
 var gamePaused = true;
 window.gamePaused = true;
+window.ssGameStarted = false;
 
 (function () {
   'use strict';
@@ -24,6 +25,7 @@ window.gamePaused = true;
   var pauseStartedAt = 0;
   var themeFlashTimer = null;
   var scorePopTimer = null;
+  window.uiCurrentScreen = currentScreen;
 
   // ===== DOM refs =====
   var $ = function (sel) { return document.querySelector(sel); };
@@ -45,6 +47,7 @@ window.gamePaused = true;
   // ===== Screen Switcher =====
   function showScreen(name) {
     currentScreen = name;
+    window.uiCurrentScreen = name;
     Object.keys(screens).forEach(function (k) {
       if (screens[k]) {
         if (k === name) screens[k].classList.remove('hidden');
@@ -502,6 +505,7 @@ window.gamePaused = true;
   window.uiStartGame = function () {
     if (gameLaunching || currentScreen === 'playing') return;
     gameLaunching = true;
+    window.ssGameStarted = true;
     // Check WebGL support before loading game
     var canvas = document.getElementById('glcanvas');
     var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');

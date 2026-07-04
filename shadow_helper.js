@@ -104,7 +104,7 @@ function drawGlow(gl, projectionMatrix, programInfo, texture, x, y, z, sx, sy) {
 
     const modelViewMatrix = mat4.create();
     mat4.translate(modelViewMatrix, modelViewMatrix, [x, y, z]);
-    mat4.scale(modelViewMatrix, modelViewMatrix, [sx * 2, sy * 2, 1]);
+    mat4.scale(modelViewMatrix, modelViewMatrix, [sx * 2, 1, sy * 2]);
 
     const normalMatrix = mat4.create();
     mat4.invert(normalMatrix, modelViewMatrix);
