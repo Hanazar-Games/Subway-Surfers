@@ -25,6 +25,7 @@ window.ssGameStarted = false;
   var pauseStartedAt = 0;
   var themeFlashTimer = null;
   var scorePopTimer = null;
+  var keyHintTimer = null;
   window.uiCurrentScreen = currentScreen;
 
   // ===== DOM refs =====
@@ -81,6 +82,7 @@ window.ssGameStarted = false;
     }
     var db = $('#distance-bar');
     if (db) db.classList.remove('visible');
+    hideKeyHint();
   }
 
   // ===== Countdown =====
@@ -470,10 +472,28 @@ window.ssGameStarted = false;
   function showKeyHint() {
     var hint = $('#key-hint');
     if (hint) {
+      hint.style.transition = '';
       hint.classList.add('visible');
-      setTimeout(function () {
+      if (keyHintTimer) clearTimeout(keyHintTimer);
+      keyHintTimer = setTimeout(function () {
         if (hint) hint.classList.remove('visible');
+        keyHintTimer = null;
       }, 3500);
+    }
+  }
+  function hideKeyHint() {
+    var hint = $('#key-hint');
+    if (keyHintTimer) {
+      clearTimeout(keyHintTimer);
+      keyHintTimer = null;
+    }
+    if (hint) {
+      hint.style.transition = 'none';
+      hint.classList.remove('visible');
+      hint.offsetHeight;
+      requestAnimationFrame(function () {
+        hint.style.transition = '';
+      });
     }
   }
 
