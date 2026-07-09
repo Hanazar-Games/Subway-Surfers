@@ -230,6 +230,9 @@ function updateTrainRumble(intensity) {
     if (!trainRumbleOsc) {
         trainRumbleOsc = audioCtx.createOscillator();
         trainRumbleGain = audioCtx.createGain();
+        // Start silent — the default gain of 1.0 would blast a sawtooth
+        // burst before the first setTargetAtTime ramp settles
+        trainRumbleGain.gain.value = 0;
         trainRumbleOsc.type = 'sawtooth';
         trainRumbleOsc.frequency.value = 45;
         // Lowpass filter for rumble
@@ -1305,6 +1308,7 @@ function main() {
           if (player.pos[0] == duck_obs_stop[i].pos[0]) {
             if (player.pos[1] >= duck_obs_stop[i].pos[1] - 4 && player.pos[1] <= duck_obs_stop[i].pos[1] + 4) {
               if (duck_obs_stop[i].pos[2] >= player.pos[2] - 0.7 && duck_obs_stop[i].pos[2] <= player.pos[2] + 0.7) {
+                if (dying) break;
                 d = new Date();
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
                   Die();
@@ -1333,6 +1337,7 @@ function main() {
           if (player.pos[0] == jump_obs[i].pos[0]) {
             if (player.pos[1] >= jump_obs[i].pos[1] - 2 && player.pos[1] <= jump_obs[i].pos[1] + 2) {
               if (player.pos[2] <= jump_obs[i].pos[2] + 0.2 && player.pos[2] >= jump_obs[i].pos[2] - 0.2) {
+                if (dying) break;
                 d = new Date();
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
                   score = -player.pos[2] + coins_collected;
@@ -1361,6 +1366,7 @@ function main() {
         if (i != obstacle_hit || obstacle_hit_type != 'rope') {
           if (rope_stop[i].pos[1] <= player.pos[1] + 0.5 && rope_stop[i].pos[1] >= player.pos[1] - 0.5) {
             if (player.pos[2] <= rope_stop[i].pos[2] + 0.02 && player.pos[2] >= rope_stop[i].pos[2] - 0.02) {
+              if (dying) break;
               d = new Date();
               if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
                 score = -player.pos[2] + coins_collected;
@@ -1535,7 +1541,7 @@ function main() {
       }
     }
 
-    if (player.pos[2] <= -800) {
+    if (player.pos[2] <= -800 && !dying) {
       score = -player.pos[2] + coins_collected;
       // Victory celebration
       playVictorySound();

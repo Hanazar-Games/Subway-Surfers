@@ -228,9 +228,18 @@ window.ssGameStarted = false;
   ];
 
   function getStats() {
+    var def = { games: 0, wins: 0, totalCoins: 0, best: 0, maxCoins: 0 };
     var raw = localStorage.getItem('ss_stats');
-    if (!raw) return { games: 0, wins: 0, totalCoins: 0, best: 0, maxCoins: 0 };
-    try { return JSON.parse(raw); } catch (e) { return { games: 0, wins: 0, totalCoins: 0, best: 0, maxCoins: 0 }; }
+    if (!raw) return def;
+    try {
+      var parsed = JSON.parse(raw);
+      // Older saves may miss keys (or hold garbage); backfill so
+      // comparisons like `finalCoins > s.maxCoins` never silently fail
+      Object.keys(def).forEach(function (k) {
+        if (typeof parsed[k] !== 'number' || !isFinite(parsed[k])) parsed[k] = def[k];
+      });
+      return parsed;
+    } catch (e) { return def; }
   }
   function saveStats(obj) {
     localStorage.setItem('ss_stats', JSON.stringify(obj));
@@ -301,7 +310,8 @@ window.ssGameStarted = false;
   // ===== High Score =====
   function getHighScore() {
     var v = localStorage.getItem('ss_highscore');
-    return v === null ? 0 : parseInt(v, 10);
+    var n = v === null ? 0 : parseInt(v, 10);
+    return isFinite(n) ? n : 0;
   }
   function setHighScore(val) {
     var cur = getHighScore();
@@ -382,16 +392,14 @@ window.ssGameStarted = false;
         lastScore = score;
         if (scoreEl) {
           scoreEl.textContent = formatNum(Math.floor(score));
-          popScore(scoreEl);
-          // Score pop animation intensity based on change size
-          if (diff >= 5) {
-            scoreEl.style.transform = 'scale(1.25)';
-            setTimeout(function() { if (scoreEl) scoreEl.style.transform = ''; }, 150);
-          }
-          // Near-record / new-record pulse
+          // Score ticks up continuously with distance; only pop on
+          // meaningful jumps (coin bursts) to avoid constant jitter
+          if (diff >= 5) popScore(scoreEl);
+          // Near-record / new-record pulse (skip on first-ever run:
+          // everything is a "record" when best is 0)
           var best = getHighScore();
           var cur = Math.floor(score);
-          if (cur > best) {
+          if (best > 0 && cur > best) {
             scoreEl.style.color = 'var(--neon-gold)';
             scoreEl.style.textShadow = '0 0 15px rgba(255,215,0,0.5)';
             scoreEl.classList.add('record-pulse');
@@ -552,6 +560,9 @@ window.ssGameStarted = false;
         var s = getAudioSettings();
         if (gameAudio) { gameAudio.volume = 0; gameAudio.play().catch(function(){}); }
         fadeAudio(s.music, 1500);
+        // Countdown may finish while the tab is hidden — don't let the
+        // run start unattended
+        if (document.hidden) uiPauseGame();
       });
     }
     if (typeof main !== 'function') {
@@ -650,6 +661,7 @@ window.ssGameStarted = false;
 
   // ===== Public: Game Over =====
   window.uiGameOver = function (won, finalScore, finalCoins) {
+    if (currentScreen === 'gameover') return; // guard against double-fire (stats would double-count)
     setPaused(true);
     gameLaunching = false;
     resumePending = false;
@@ -693,34 +705,31 @@ window.ssGameStarted = false;
       bestV.textContent = formatNum(getHighScore()) + (isNewBest ? ' ★' : '');
     }
     if (isNewBest) {
-      if (title) {
+      // The title announces the record (kept as YOU WON! on a win — the
+      // gold Best value with ★, confetti and burst already celebrate it);
+      // flash + confetti + burst carry the rest so text isn't repeated
+      if (title && !won) {
         title.textContent = 'NEW RECORD!';
         title.style.color = 'var(--neon-gold)';
         title.style.textShadow = '0 0 30px rgba(255,215,0,0.5)';
-      }
-      if (typeof showComboText === 'function') {
-        setTimeout(function() {
-          var rect = document.getElementById('glcanvas').getBoundingClientRect();
-          showComboText('NEW RECORD!', rect.left + rect.width / 2, rect.top + rect.height * 0.25);
-        }, 300);
       }
       if (typeof flashScreen === 'function') {
         setTimeout(function() { flashScreen('rgba(255,215,0,0.2)', 0.4); }, 200);
       }
       spawnConfetti();
     }
-    // Show achievement unlock toast
+    // Show achievement unlock toasts (stacked so they don't overlap)
     newAchievements.forEach(function (a, i) {
       setTimeout(function () {
-        showAchievementToast(a);
+        showAchievementToast(a, i);
       }, i * 800 + 500);
     });
 
     // Achievement unlock toast helper
-    function showAchievementToast(a) {
+    function showAchievementToast(a, index) {
       var toast = document.createElement('div');
       toast.style.cssText =
-        'position:fixed; top:80px; left:50%; transform:translateX(-50%); z-index:500;' +
+        'position:fixed; top:' + (80 + index * 56) + 'px; left:50%; transform:translateX(-50%); z-index:500;' +
         'background:rgba(15,15,24,0.95); border:1px solid rgba(255,215,0,0.3);' +
         'border-radius:12px; padding:12px 24px; display:flex; align-items:center; gap:12px;' +
         'font-size:14px; color:#fff; box-shadow:0 0 30px rgba(255,215,0,0.2);' +
@@ -732,17 +741,12 @@ window.ssGameStarted = false;
       }, 3000);
     }
 
-    // New record celebration
+    // New record burst behind the card content
     var card = document.querySelector('#gameover-overlay .glass-card');
     if (isNewBest && card) {
       var burst = document.createElement('div');
       burst.className = 'new-record-burst';
       card.appendChild(burst);
-      var recText = document.createElement('div');
-      recText.className = 'new-record-text';
-      recText.textContent = 'NEW RECORD!';
-      recText.style.marginBottom = '12px';
-      card.insertBefore(recText, card.firstChild.nextSibling);
       setTimeout(function () {
         if (burst.parentNode) burst.parentNode.removeChild(burst);
       }, 1000);
@@ -894,14 +898,19 @@ window.ssGameStarted = false;
 
     // Swipe gesture support (anywhere on screen during gameplay)
     var touchStartX = 0, touchStartY = 0;
+    var swipeFromControls = false;
     var minSwipe = 40;
     document.addEventListener('touchstart', function(e) {
       if (currentScreen !== 'playing') return;
+      // Touches starting on the on-screen buttons already emit a key on
+      // pointerdown — don't let the same gesture fire a swipe too
+      var t = e.target;
+      swipeFromControls = !!(t && t.closest && t.closest('#touch-controls'));
       touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
     }, { passive: true });
     document.addEventListener('touchend', function(e) {
-      if (currentScreen !== 'playing') return;
+      if (currentScreen !== 'playing' || swipeFromControls) return;
       var dx = e.changedTouches[0].clientX - touchStartX;
       var dy = e.changedTouches[0].clientY - touchStartY;
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minSwipe) {
@@ -911,14 +920,27 @@ window.ssGameStarted = false;
       }
     }, { passive: true });
 
-    // ESC to pause/resume, Enter/Space to restart from gameover
+    // ESC to pause/resume (or back out of menu subscreens),
+    // Enter/Space to restart from gameover
     document.addEventListener('keydown', function (e) {
       if (e.key === 'Escape') {
         if (currentScreen === 'playing') uiPauseGame();
         else if (currentScreen === 'pause') uiResumeGame();
+        else if (currentScreen === 'howto' || currentScreen === 'stats' || currentScreen === 'settings') {
+          showScreen('start');
+        }
       }
       if ((e.key === 'Enter' || e.key === ' ') && currentScreen === 'gameover') {
         uiRestartGame();
+      }
+    });
+
+    // Auto-pause when the tab is hidden (all gameplay timers are
+    // wall-clock based, so leaving the game running while hidden would
+    // let police/power-up timers drift)
+    document.addEventListener('visibilitychange', function () {
+      if (document.hidden && currentScreen === 'playing' && !countdownActive) {
+        uiPauseGame();
       }
     });
 
