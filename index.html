@@ -415,10 +415,16 @@
     })();
 
     // Splash fadeout + reveal start menu
-    // Skip splash on page reload if user disabled it
-    var skipSplash = sessionStorage.getItem('ss_skipSplash') === 'true';
+    // Skip splash on restart/menu reloads (one-shot session flag) or when
+    // the user disabled the intro animation in settings (persistent).
+    var skipSplash = sessionStorage.getItem('ss_skipSplash') === 'true'
+      || localStorage.getItem('ss_showIntro') === 'false';
+    sessionStorage.removeItem('ss_skipSplash');
     var splashDuration = skipSplash ? 0 : 3000;
-    setTimeout(function () {
+    var splashDone = false;
+    function endSplash() {
+      if (splashDone) return;
+      splashDone = true;
       var splash = document.getElementById('splash-screen');
       if (splash) {
         splash.style.display = 'none';
@@ -426,7 +432,15 @@
       }
       var start = document.getElementById('start-screen');
       if (start && !window.ssGameStarted) start.classList.remove('hidden');
-    }, splashDuration);
+      document.removeEventListener('keydown', endSplash);
+      document.removeEventListener('pointerdown', endSplash);
+    }
+    setTimeout(endSplash, splashDuration);
+    // "PRESS ANY KEY TO START" — let any key or tap skip the splash
+    if (!skipSplash) {
+      document.addEventListener('keydown', endSplash);
+      document.addEventListener('pointerdown', endSplash);
+    }
   </script>
 
   <!-- ===== UI Controller ===== -->

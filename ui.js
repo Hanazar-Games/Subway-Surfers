@@ -578,7 +578,7 @@ window.ssGameStarted = false;
     resumePending = false;
     pauseStartedAt = Date.now() * 0.001;
     stopHUDUpdate();
-    fadeAudio(0.1, 500);
+    fadeAudio(Math.min(0.1, getAudioSettings().music), 500);
     if (typeof updateTrainRumble === 'function') updateTrainRumble(0);
     var flash = document.getElementById('screen-flash');
     if (flash) { flash.style.background = 'rgba(0,0,0,0.4)'; flash.style.opacity = '1'; flash.style.transition = 'opacity 0.3s'; }
@@ -605,7 +605,7 @@ window.ssGameStarted = false;
     showHUD();
     if (pauseStartedAt) {
       var pausedFor = Date.now() * 0.001 - pauseStartedAt;
-      ['startTime', 'policeCaughtUp', 'obstacle_hit_time', 'boots_acquired', 'fb_acquired', 'hoverboard_acquired', 'flash_start_time'].forEach(function (name) {
+      ['startTime', 'policeCaughtUp', 'obstacle_hit_time', 'boots_acquired', 'fb_acquired', 'hoverboard_acquired', 'flash_start_time', 'lastCoinTime', 'nearMissTimer'].forEach(function (name) {
         if (typeof window[name] === 'number' && isFinite(window[name])) window[name] += pausedFor;
       });
       pauseStartedAt = 0;
@@ -682,7 +682,7 @@ window.ssGameStarted = false;
     }
     if (scoreV) scoreV.textContent = formatNum(Math.floor(finalScore));
     if (coinV) coinV.textContent = finalCoins;
-    if (distV) distV.textContent = (typeof score !== 'undefined' ? Math.floor(-player.pos[2]) : 0) + 'm';
+    if (distV) distV.textContent = (typeof player !== 'undefined' && player ? Math.floor(-player.pos[2]) : 0) + 'm';
     if (streakV) streakV.textContent = typeof bestStreak !== 'undefined' ? bestStreak : 0;
     if (powersV) powersV.textContent = typeof powersCollected !== 'undefined' ? powersCollected : 0;
 
@@ -733,7 +733,7 @@ window.ssGameStarted = false;
     }
 
     // New record celebration
-    var card = $('.glass-card', $('#gameover-overlay'));
+    var card = document.querySelector('#gameover-overlay .glass-card');
     if (isNewBest && card) {
       var burst = document.createElement('div');
       burst.className = 'new-record-burst';
@@ -832,11 +832,12 @@ window.ssGameStarted = false;
       };
     }
 
-    // Splash toggle
+    // Splash toggle (persistent preference; separate from the one-shot
+    // ss_skipSplash session flag used by restart/menu reloads)
     if (toggleSplash) {
-      toggleSplash.checked = sessionStorage.getItem('ss_skipSplash') !== 'true';
+      toggleSplash.checked = localStorage.getItem('ss_showIntro') !== 'false';
       toggleSplash.onchange = function () {
-        sessionStorage.setItem('ss_skipSplash', toggleSplash.checked ? '' : 'true');
+        localStorage.setItem('ss_showIntro', toggleSplash.checked ? 'true' : 'false');
       };
     }
     // FPS toggle
@@ -848,6 +849,8 @@ window.ssGameStarted = false;
         fpsVisible = toggleFps.checked;
         localStorage.setItem('ss_showFps', fpsVisible ? 'true' : 'false');
         if (fpsEl) fpsEl.classList.toggle('visible', fpsVisible);
+        frameCount = 0;
+        lastFpsTime = performance.now();
       };
     }
 
@@ -856,7 +859,7 @@ window.ssGameStarted = false;
     var tRight = $('#touch-right');
     var tJump = $('#touch-jump');
     var tDuck = $('#touch-duck');
-    var lastTouchEmit = 0;
+    var lastTouchEmit = {};
     function emitKey(code) {
       if (currentScreen !== 'playing' || countdownActive) return;
       var ev = new KeyboardEvent('keydown', { bubbles: true });
@@ -873,8 +876,8 @@ window.ssGameStarted = false;
       var handler = function (e) {
         e.preventDefault();
         var now = Date.now();
-        if (now - lastTouchEmit < 90) return;
-        lastTouchEmit = now;
+        if (now - (lastTouchEmit[code] || 0) < 90) return;
+        lastTouchEmit[code] = now;
         emitKey(code);
       };
       if (window.PointerEvent) {

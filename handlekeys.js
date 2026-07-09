@@ -21,19 +21,22 @@ document.addEventListener(
         if ([32, 37, 38, 39, 40].indexOf(key) !== -1) {
             event.preventDefault();
         }
-        if (key == 39) {
+        // Only move/tilt/play sound when there is actually a lane to move into
+        if (key == 39 && player.pos[0] < 6) {
             player.pos[0] += 6;
             police.pos[0] = player.pos[0];
-            if (player) player.tilt = -0.25;
+            player.tilt = -0.25;
             if (typeof playBumpSound === 'function') playBumpSound();
         }
-        if (key == 37) {
+        if (key == 37 && player.pos[0] > -6) {
             player.pos[0] -= 6;
             police.pos[0] = player.pos[0];
-            if (player) player.tilt = 0.25;
+            player.tilt = 0.25;
             if (typeof playBumpSound === 'function') playBumpSound();
         }
-        if (key == 38) {
+        // Ignore jump while already rising or while flying (prevents mid-air
+        // jump refresh / sound spam and stale jump state after fly boost)
+        if (key == 38 && !jumping && !player.fly_boost) {
             if (player.pos[1] < -4) {
                 player.pos[1] = -4;
             }

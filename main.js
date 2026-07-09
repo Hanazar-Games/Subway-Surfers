@@ -58,6 +58,7 @@ var d, startTime, policeCaughtUp, obstacle_hit_time, flash_start_time, boots_acq
 var theme = 1;
 var theme_flag = 1;
 var obstacle_hit = -1;
+var obstacle_hit_type = ''; // 'duck' | 'jump' | 'rope' — disambiguates the shared index
 
 var jump_height = 0;
 var duck_ground = -5;
@@ -121,7 +122,10 @@ function initSfx() {
     var storedVolume = 0.5;
     try {
         var raw = localStorage.getItem('ss_audio');
-        if (raw) storedVolume = JSON.parse(raw).sfx;
+        if (raw) {
+            var v = Number(JSON.parse(raw).sfx);
+            if (isFinite(v)) storedVolume = v;
+        }
     } catch (e) {}
     sfxMasterGain.gain.value = Math.max(0, Math.min(1, storedVolume)) * 0.8;
     sfxMasterGain.connect(audioCtx.destination);
@@ -241,6 +245,30 @@ function updateTrainRumble(intensity) {
     var vol = Math.min(0.25, intensity * 0.15);
     trainRumbleGain.gain.setTargetAtTime(vol, t, 0.05);
     trainRumbleOsc.frequency.setTargetAtTime(40 + intensity * 15, t, 0.05);
+}
+
+function playVictorySound() {
+    initSfx();
+    resumeSfx();
+    if (!audioCtx) return;
+    var t = audioCtx.currentTime;
+    // Ascending fanfare arpeggio (C5 E5 G5 C6)
+    var notes = [523.25, 659.25, 783.99, 1046.5];
+    for (var i = 0; i < notes.length; i++) {
+        var osc = audioCtx.createOscillator();
+        var gain = audioCtx.createGain();
+        osc.type = 'triangle';
+        osc.frequency.value = notes[i];
+        var st = t + i * 0.12;
+        var isLast = i === notes.length - 1;
+        gain.gain.setValueAtTime(0, st);
+        gain.gain.linearRampToValueAtTime(0.22, st + 0.02);
+        gain.gain.exponentialRampToValueAtTime(0.001, st + (isLast ? 0.6 : 0.25));
+        osc.connect(gain);
+        gain.connect(sfxMasterGain);
+        osc.start(st);
+        osc.stop(st + (isLast ? 0.7 : 0.3));
+    }
 }
 
 function playJumpSound() {
@@ -1273,12 +1301,13 @@ function main() {
       // collision with duck_obs
       var num_high = duck_obs_stop.length;
       for (var i = 0; i < num_high; i++) {
-        if (i != obstacle_hit) {
+        if (i != obstacle_hit || obstacle_hit_type != 'duck') {
           if (player.pos[0] == duck_obs_stop[i].pos[0]) {
             if (player.pos[1] >= duck_obs_stop[i].pos[1] - 4 && player.pos[1] <= duck_obs_stop[i].pos[1] + 4) {
               if (duck_obs_stop[i].pos[2] >= player.pos[2] - 0.7 && duck_obs_stop[i].pos[2] <= player.pos[2] + 0.7) {
                 d = new Date();
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
+                  Die();
                   if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
                 }
                 else {
@@ -1286,6 +1315,7 @@ function main() {
                   playBumpSound();
                   if (typeof flashScreen === 'function') flashScreen('#ff8800', 0.15);
                   obstacle_hit = i;
+                  obstacle_hit_type = 'duck';
                   player.speedz = player_speed / 2;
                   policeCaughtUp = d.getTime() * 0.001;
                   obstacle_hit_time = policeCaughtUp;
@@ -1299,13 +1329,14 @@ function main() {
       // collision with jump_obs
       var num_low = jump_obs.length;
       for (var i = 0; i < num_low; i++) {
-        if (i != obstacle_hit) {
+        if (i != obstacle_hit || obstacle_hit_type != 'jump') {
           if (player.pos[0] == jump_obs[i].pos[0]) {
             if (player.pos[1] >= jump_obs[i].pos[1] - 2 && player.pos[1] <= jump_obs[i].pos[1] + 2) {
               if (player.pos[2] <= jump_obs[i].pos[2] + 0.2 && player.pos[2] >= jump_obs[i].pos[2] - 0.2) {
                 d = new Date();
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
                   score = -player.pos[2] + coins_collected;
+                  Die();
                   if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
                 }
                 else {
@@ -1313,6 +1344,7 @@ function main() {
                   playBumpSound();
                   if (typeof flashScreen === 'function') flashScreen('#ff8800', 0.15);
                   obstacle_hit = i;
+                  obstacle_hit_type = 'jump';
                   player.speedz = player_speed / 2;
                   policeCaughtUp = d.getTime() * 0.001;
                   obstacle_hit_time = policeCaughtUp;
@@ -1326,18 +1358,21 @@ function main() {
       // collision with rope
       var num_rope = rope_stop.length;
       for (var i = 0; i < num_rope; i++) {
-        if (i != obstacle_hit) {
+        if (i != obstacle_hit || obstacle_hit_type != 'rope') {
           if (rope_stop[i].pos[1] <= player.pos[1] + 0.5 && rope_stop[i].pos[1] >= player.pos[1] - 0.5) {
             if (player.pos[2] <= rope_stop[i].pos[2] + 0.02 && player.pos[2] >= rope_stop[i].pos[2] - 0.02) {
               d = new Date();
               if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
                 score = -player.pos[2] + coins_collected;
+                Die();
                 if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
               }
               else {
                 cameraShake = 0.3; safeVibrate(30);
                 playBumpSound();
+                if (typeof flashScreen === 'function') flashScreen('#ff8800', 0.15);
                 obstacle_hit = i;
+                obstacle_hit_type = 'rope';
                 player.speedz = player_speed / 2;
                 policeCaughtUp = d.getTime() * 0.001;
                 obstacle_hit_time = policeCaughtUp;
@@ -1503,6 +1538,7 @@ function main() {
     if (player.pos[2] <= -800) {
       score = -player.pos[2] + coins_collected;
       // Victory celebration
+      playVictorySound();
       if (typeof flashScreen === 'function') flashScreen('#ffd700', 0.5);
       if (typeof spawnConfetti === 'function') spawnConfetti();
       for (var p = 0; p < 40; p++) {
