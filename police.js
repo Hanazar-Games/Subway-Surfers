@@ -217,12 +217,29 @@ let Police = class {
             indices: indexBuffer,
         };
 
+
         this.headBuffer = {
             position: this.headPositionBuffer,
             normal: headNormalBuffer,
             textureCoord: headTextureCoordBuffer,
             indices: headIndexBuffer,
         };
+    }
+
+    // Draws the already-bound unit cube again as a limb, offset/scaled/swung
+    // off the body matrix.
+    drawBodyPart(gl, projectionMatrix, programInfo, baseMatrix, offset, scale, rotation, axis) {
+        const partMatrix = mat4.clone(baseMatrix);
+        mat4.translate(partMatrix, partMatrix, offset);
+        if (rotation) mat4.rotate(partMatrix, partMatrix, rotation, axis || [1, 0, 0]);
+        mat4.scale(partMatrix, partMatrix, scale);
+        const normalMatrix = mat4.create();
+        mat4.invert(normalMatrix, partMatrix);
+        mat4.transpose(normalMatrix, normalMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, partMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.normalMatrix, false, normalMatrix);
+        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
     }
 
     drawCube(gl, projectionMatrix, programInfo, deltaTime) {
@@ -325,6 +342,16 @@ let Police = class {
             const offset = 0;
             gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
         }
+
+        // ========== DRAW LIMBS ==========
+        // Body buffers are still bound, so limbs reuse the same unit cube.
+        var stride = Math.sin(t * 1.55) * 0.5 * runFactor;
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [-0.72, 0.2, 0.02], [0.3, 0.5, 0.5], stride, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0.72, 0.2, 0.02], [0.3, 0.5, 0.5], -stride, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [-0.25, -1.45, 0.02], [0.3, 0.42, 0.42], -stride, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0.25, -1.45, 0.02], [0.3, 0.42, 0.42], stride, [1, 0, 0]);
+        // Peaked cap brim
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0, 1.72, 0.2], [0.6, 0.09, 0.5], 0, [1, 0, 0]);
 
         // ========== DRAW HEAD ==========
         {

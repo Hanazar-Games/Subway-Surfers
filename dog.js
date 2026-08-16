@@ -191,6 +191,22 @@ let Dog = class {
         };
     }
 
+    // Draws the already-bound unit cube again as a limb, offset/scaled/swung
+    // off the body matrix.
+    drawBodyPart(gl, projectionMatrix, programInfo, baseMatrix, offset, scale, rotation, axis) {
+        const partMatrix = mat4.clone(baseMatrix);
+        mat4.translate(partMatrix, partMatrix, offset);
+        if (rotation) mat4.rotate(partMatrix, partMatrix, rotation, axis || [1, 0, 0]);
+        mat4.scale(partMatrix, partMatrix, scale);
+        const normalMatrix = mat4.create();
+        mat4.invert(normalMatrix, partMatrix);
+        mat4.transpose(normalMatrix, normalMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.projectionMatrix, false, projectionMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, partMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.normalMatrix, false, normalMatrix);
+        gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
+    }
+
     drawCube(gl, projectionMatrix, programInfo, deltaTime) {
         // Draw shadow slightly below feet
         gl.disable(gl.DEPTH_TEST);
@@ -286,6 +302,16 @@ let Dog = class {
             const offset = 0;
             gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
         }
+
+        // ========== DRAW LEGS / TAIL ==========
+        // Body buffers are still bound, so these reuse the same unit cube.
+        var gait = Math.sin(t * 1.6) * 0.55 * runFactor;
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [-0.13, -0.3, 0.26], [0.09, 0.24, 0.24], gait, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0.13, -0.3, 0.26], [0.09, 0.24, 0.24], -gait, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [-0.13, -0.3, -0.26], [0.09, 0.24, 0.24], -gait, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0.13, -0.3, -0.26], [0.09, 0.24, 0.24], gait, [1, 0, 0]);
+        // Tail, wagging out the back
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0, 0.16, -0.46], [0.07, 0.07, 0.3], 0.5 + gait * 0.4, [1, 0, 0]);
 
         // ========== DRAW HEAD ==========
         {

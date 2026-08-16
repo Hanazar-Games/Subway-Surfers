@@ -389,10 +389,19 @@ let Player = class {
         var stride = Math.sin(t * 1.55) * 0.45 * runFactor;
         var armSwing = stride;
         var legSwing = -stride;
+        // Upper arms
         this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [-0.62, 0.15, 0.02], [0.28, 0.45, 0.45], armSwing, [1, 0, 0]);
         this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0.62, 0.15, 0.02], [0.28, 0.45, 0.45], -armSwing, [1, 0, 0]);
+        // Forearms, hinged further along the swing so the arms read as bent
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [-0.62, -0.42, 0.02 + armSwing * 0.5], [0.24, 0.34, 0.34], armSwing * 1.6, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0.62, -0.42, 0.02 - armSwing * 0.5], [0.24, 0.34, 0.34], -armSwing * 1.6, [1, 0, 0]);
+        // Thighs
         this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [-0.22, -1.32, 0.02], [0.28, 0.38, 0.38], legSwing, [1, 0, 0]);
         this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0.22, -1.32, 0.02], [0.28, 0.38, 0.38], -legSwing, [1, 0, 0]);
+        // Shoes, planted at the end of each leg
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [-0.22, -1.86, 0.06 + legSwing * 0.55], [0.3, 0.16, 0.46], legSwing * 0.35, [1, 0, 0]);
+        this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0.22, -1.86, 0.06 - legSwing * 0.55], [0.3, 0.16, 0.46], -legSwing * 0.35, [1, 0, 0]);
+        // Backpack + cap brim
         this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0, 0.1, -0.42], [0.55, 0.55, 0.32], 0, [1, 0, 0]);
         this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0, 1.48, 0.18], [0.55, 0.08, 0.45], 0, [1, 0, 0]);
 

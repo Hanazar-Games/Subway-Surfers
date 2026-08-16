@@ -421,11 +421,6 @@ html, body {
   color: var(--neon-pink);
   text-shadow: 0 0 20px rgba(255,42,109,0.4);
 }
-.result-title.win {
-  color: var(--neon-gold);
-  text-shadow: 0 0 20px rgba(255,215,0,0.4);
-}
-
 .result-stats {
   display: flex; gap: 40px;
   justify-content: center;

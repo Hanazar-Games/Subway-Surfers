@@ -73,7 +73,13 @@ var wasInAir = false;
 var greyScale = false;
 var flashing = false;
 var train_speeds = new Array();
-var player_speed = 0.5;
+var SPEED_BASE = 0.34, SPEED_GAIN = 0.71, SPEED_RAMP_DIST = 2600;
+var player_speed = SPEED_BASE;
+// 0 at the opening jog, 1 once the ramp tops out
+function speedRatio01() {
+  var r = (player_speed - SPEED_BASE) / SPEED_GAIN;
+  return r < 0 ? 0 : (r > 1 ? 1 : r);
+}
 var currentFov = 70; // starts wide, narrows during intro dive
 
 var score = 0;
@@ -98,9 +104,10 @@ var runDistance = 0; // frozen alongside score when the player dies
 // ===== Endless streaming =====
 // Ground and backdrop are fixed-size pools cycled behind the camera; obstacles
 // keep their original spacing but are re-placed ahead once they fall behind.
-var TRACK_POOL = 32, TRACK_SPACING = 5;
-var WALL_POOL = 32, WALL_SPACING = 5;
-var CITY_POOL = 20, CITY_SPACING = 10;
+// Pools must span the recycle line (cam_z + 20) down past cullFar (cam_z - 145)
+var TRACK_POOL = 36, TRACK_SPACING = 5;
+var WALL_POOL = 36, WALL_SPACING = 5;
+var CITY_POOL = 22, CITY_SPACING = 10;
 var WORLD_START_Z = 40; // ground begins above the intro camera, not at z=0
 var spawnFrontier = {}; // furthest Z handed out per obstacle type
 
@@ -952,6 +959,12 @@ function main() {
     var deltaTime = now - then;
     if (deltaTime > 0.1) deltaTime = 0.1; // cap to prevent tab-inactive jumps
     then = now;
+    // All movement below is authored per-frame against 60fps. Without this the
+    // game literally runs at double speed on a 120Hz display. Clamped so a
+    // dropped frame cannot teleport the player through an obstacle.
+    var timeScale = deltaTime * 60;
+    if (timeScale > 2) timeScale = 2;
+    else if (timeScale < 0.25) timeScale = 0.25;
 
     // Select shader program
     var activeProgram = programInfo;
@@ -995,7 +1008,10 @@ function main() {
       score = distance + coins_collected;
       runDistance = distance;
     }
-    player_speed = 0.5 + Math.min(0.5, distance / 3000);
+    // Ease-in difficulty: an easy jog for the opening stretch, then it climbs
+    // steadily. Exponent > 1 keeps the first few hundred metres gentle.
+    var ramp = Math.min(1, distance / SPEED_RAMP_DIST);
+    player_speed = SPEED_BASE + SPEED_GAIN * Math.pow(ramp, 1.35);
     // Endless run: the bar fills toward the next 500m marker
     if (_distFill && _distText) {
       _distFill.style.width = ((distance % 500) / 5) + '%';
@@ -1008,9 +1024,9 @@ function main() {
     // Death slow-motion: gradually freeze time then end game
     if (dying) {
       deathTimer += deltaTime;
-      player.speedz *= 0.85;
-      cameraShake *= 0.9;
-      camFollow += 0.15; // camera pulls back on death
+      player.speedz *= Math.pow(0.85, timeScale);
+      cameraShake *= Math.pow(0.9, timeScale);
+      camFollow += 0.15 * timeScale; // camera pulls back on death
       if (deathTimer > 0.8) {
         dying = false;
         deathTimer = 0;
@@ -1051,12 +1067,12 @@ function main() {
 
     // Time dilation (near-miss slow-mo effect)
     if (timeDilation < 1.0) {
-      timeDilation += 0.03;
+      timeDilation += 0.03 * timeScale;
       if (timeDilation > 1.0) timeDilation = 1.0;
     }
 
     // move forward
-    var effectiveSpeed = player.speedz * timeDilation;
+    var effectiveSpeed = player.speedz * timeDilation * timeScale;
     // Thin obstacles (ropes, jump bars) are narrower than one frame of travel,
     // so their hit tests sweep the segment the player crossed this frame.
     var prevPlayerZ = player.pos[2];
@@ -1065,8 +1081,8 @@ function main() {
 
     // start-of-game camera push-in animation
     if (gameStartAnim) {
-      camFollow += (CAM_FOLLOW_DIST - camFollow) * 0.08;
-      currentFov += (45 - currentFov) * 0.08;
+      camFollow += (CAM_FOLLOW_DIST - camFollow) * 0.08 * timeScale;
+      currentFov += (45 - currentFov) * 0.08 * timeScale;
       if (camFollow - CAM_FOLLOW_DIST < 0.05) {
         camFollow = CAM_FOLLOW_DIST;
         currentFov = 45;
@@ -1076,27 +1092,30 @@ function main() {
 
     // smooth camera vertical follow, with the landing dip springing back
     if (camDip > 0) {
-      camDip *= 0.85;
+      camDip *= Math.pow(0.85, timeScale);
       if (camDip < 0.005) camDip = 0;
     }
     var camDiff = (cam_y_target - camDip) - cam_y;
-    cam_y += camDiff * 0.08;
-    target_y = cam_y - 7.2;
+    cam_y += camDiff * Math.min(1, 0.08 * timeScale);
+    // Look 5 down over 10 forward (~26.6 degrees). Steeper than this and the
+    // vanishing point climbs above the top of the frame, which left only ~28
+    // units of track visible ahead of the player — under a second of warning.
+    target_y = cam_y - 5;
     cam_z = player.pos[2] + camFollow;
 
     // Endless world: everything behind the camera comes back out in front
     streamWorld(gl, effectiveSpeed * 0.06);
 
     // recover tilt back to upright
-    if (player.tilt > 0) { player.tilt -= 0.02; if (player.tilt < 0) player.tilt = 0; }
-    if (player.tilt < 0) { player.tilt += 0.02; if (player.tilt > 0) player.tilt = 0; }
+    if (player.tilt > 0) { player.tilt -= 0.02 * timeScale; if (player.tilt < 0) player.tilt = 0; }
+    if (player.tilt < 0) { player.tilt += 0.02 * timeScale; if (player.tilt > 0) player.tilt = 0; }
     d = new Date();
     var policeTimer = d.getTime() * 0.001 - policeCaughtUp;
     if (policeTimer >= 5 && policeTimer <= 10)
       police.speedz = player_speed / 2;
     else
       police.speedz = player_speed;
-    police.pos[2] -= police.speedz
+    police.pos[2] -= police.speedz * timeScale;
     // Police approaching warning (first 5 seconds after obstacle hit)
     if (policeTimer > 0 && policeTimer < 5) {
       var warnIntensity = 1.0 - policeTimer / 5;
@@ -1183,8 +1202,8 @@ function main() {
     if (!player.fly_boost) {
       // jump
       if (jumping) {
-        player.pos[1] += player.speedy;
-        player.speedy -= 0.01;
+        player.pos[1] += player.speedy * timeScale;
+        player.speedy -= 0.01 * timeScale;
         police.pos[1] = player.pos[1];
         // Wind streak particles on jump
         if (Math.random() < 0.3) {
@@ -1203,8 +1222,8 @@ function main() {
 
       if (jumping == false) {
         if (player.pos[1] > -4) {
-          player.speedy += 0.02;
-          player.pos[1] -= player.speedy;
+          player.speedy += 0.02 * timeScale;
+          player.pos[1] -= player.speedy * timeScale;
           // jump onto train
           var n = trainF.length;
           for (var i = 0; i < n; i++) {
@@ -1265,7 +1284,7 @@ function main() {
 
       // duck
       if (ducking) {
-        player.pos[1] -= player.speedy;
+        player.pos[1] -= player.speedy * timeScale;
         police.pos[1] = player.pos[1];
         if (player.pos[1] <= duck_ground) {
           ducking = false;
@@ -1275,7 +1294,7 @@ function main() {
 
       if (ducking == false) {
         if (player.pos[1] < -4) {
-          player.pos[1] += player.speedy;
+          player.pos[1] += player.speedy * timeScale;
           if (player.pos[1] > -4 && !jumping) {
             if (wasInAir) {
               wasInAir = false;
@@ -1298,7 +1317,7 @@ function main() {
     // train movement
     var num_trains = trainF.length;
     for (var i = 0; i < num_trains; i++) {
-      var tSpeed = train_speeds[i] * timeDilation;
+      var tSpeed = train_speeds[i] * timeDilation * timeScale;
       trainF[i].pos[2] += tSpeed;
       trainT[i].pos[2] += tSpeed;
       trainL[i].pos[2] += tSpeed;
@@ -1325,7 +1344,7 @@ function main() {
         var dz = player.pos[2] - coins[i].pos[2];
         var distSq = dx*dx + dy*dy + dz*dz;
         if (distSq < 36.0) { // within 6 units
-          var pull = 0.08;
+          var pull = 0.08 * timeScale;
           // Coin spins faster when being pulled
           coins[i].speed = 0.3;
           // Coin trail when being pulled
@@ -1645,7 +1664,7 @@ function main() {
     var num_boots = boots.length;
     for (var i = 0; i < num_boots; i++) {
       if (boots[i].exist) {
-        boots[i].rotation += 0.3 * timeDilation;
+        boots[i].rotation += 0.3 * timeDilation * timeScale;
         if (player.pos[0] == boots[i].pos[0]) {
           if (player.pos[1] >= boots[i].pos[1] - 1.2 && player.pos[1] <= boots[i].pos[1] + 1.2) {
             if (player.pos[2] >= boots[i].pos[2] - 1.2 && player.pos[2] <= boots[i].pos[2] + 1.2) {
@@ -1678,7 +1697,7 @@ function main() {
     var num_fb = flying_boost.length;
     for (var i = 0; i < num_fb; i++) {
       if (flying_boost[i].exist) {
-        flying_boost[i].rotation += 0.1 * timeDilation;
+        flying_boost[i].rotation += 0.1 * timeDilation * timeScale;
         if (player.pos[0] == flying_boost[i].pos[0]) {
           if (player.pos[1] >= flying_boost[i].pos[1] - 1.75 && player.pos[1] <= flying_boost[i].pos[1] + 1.75) {
             if (player.pos[2] >= flying_boost[i].pos[2] - 1.75 && player.pos[2] <= flying_boost[i].pos[2] + 1.75) {
@@ -1733,7 +1752,7 @@ function main() {
 
     // collision with hoverboard
     for (var i = 0; i < 2; i++) {
-      hoverboard[i].rotation += 0.2 * timeDilation;
+      hoverboard[i].rotation += 0.2 * timeDilation * timeScale;
       if (hoverboard[i].exist) {
         if (player.pos[0] == hoverboard[i].pos[0]) {
           if (player.pos[1] >= hoverboard[i].pos[1] - 1.2 && player.pos[1] <= hoverboard[i].pos[1] + 1.2) {
@@ -1843,7 +1862,7 @@ function main() {
     // Coin spin speed recovery
     for (var i = 0; i < coins.length; i++) {
       if (coins[i].speed > 0.1) {
-        coins[i].speed -= 0.005;
+        coins[i].speed -= 0.005 * timeScale;
         if (coins[i].speed < 0.1) coins[i].speed = 0.1;
       }
     }
@@ -1869,7 +1888,7 @@ function main() {
     if (cameraShake > 0) {
       cam_x += (Math.random() - 0.5) * cameraShake;
       cam_y += (Math.random() - 0.5) * cameraShake;
-      cameraShake *= 0.85;
+      cameraShake *= Math.pow(0.85, timeScale);
       if (cameraShake < 0.02) cameraShake = 0;
     }
 
@@ -1927,7 +1946,7 @@ function drawScene(gl, programInfo, deltaTime) {
     applyTheme(theme);
     if (theme == 1) {
       // Subtle warm shift as speed increases
-      var speedRatio = Math.min(1, (player_speed - 0.5) / 0.5);
+      var speedRatio = speedRatio01();
       var r = 144 / 256 + speedRatio * 0.05;
       var g = 228 / 256 - speedRatio * 0.02;
       var b = 252 / 256 - speedRatio * 0.05;
@@ -1947,12 +1966,14 @@ function drawScene(gl, programInfo, deltaTime) {
 
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
-  var targetFov = 45 + Math.min(1, (player_speed - 0.5) / 0.5) * 12;
+  var targetFov = 45 + speedRatio01() * 12;
   currentFov += (targetFov - currentFov) * 0.05;
   const fieldOfView = currentFov * Math.PI / 180;
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
-  const zNear = 0.1;
-  const zFar = 100.0;
+  // Nothing is ever closer than ~8 units, so a roomier zNear buys back the
+  // depth precision the longer zFar costs.
+  const zNear = 1.0;
+  const zFar = 160.0;
   const projectionMatrix = mat4.create();
 
   mat4.perspective(projectionMatrix, fieldOfView, aspect, zNear, zFar);
@@ -1977,15 +1998,15 @@ function drawScene(gl, programInfo, deltaTime) {
   if (greyScale) fogColor = [0.2, 0.2, 0.2];
   gl.useProgram(programInfo.program);
   gl.uniform3fv(programInfo.uniformLocations.uFogColor, fogColor);
-  gl.uniform1f(programInfo.uniformLocations.uFogNear, 25.0);
-  gl.uniform1f(programInfo.uniformLocations.uFogFar, 90.0);
+  gl.uniform1f(programInfo.uniformLocations.uFogNear, 55.0);
+  gl.uniform1f(programInfo.uniformLocations.uFogFar, 140.0);
   gl.uniform1f(programInfo.uniformLocations.uGlow, theme == 2 ? 0.35 : 0.0);
   gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
   gl.uniform1f(programInfo.uniformLocations.uCamZ, cam_z);
 
   // Distance-based culling bounds
   var cullNear = cam_z + 8;
-  var cullFar = cam_z - 95;
+  var cullFar = cam_z - 145;
 
   // Pre-compute object counts for culling loops
   var num_trains = trainF.length;
