@@ -797,18 +797,27 @@ window.ssGameStarted = false;
     if (btnSettingsBack) btnSettingsBack.onclick = function () { playClick(); showScreen('start'); };
     if (btnFullscreen) btnFullscreen.onclick = function () { playClick(); uiToggleFullscreen(); };
     if (btnWebglBack) btnWebglBack.onclick = function () { playClick(); showScreen('start'); };
-    if (btnShare) btnShare.onclick = function () {
-      playClick();
-      var text = 'I scored ' + formatNum(Math.floor(score || 0)) + ' in Subway Surfers! 🎮';
-      var url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text);
-      window.open(url, '_blank', 'width=600,height=400');
-      if (navigator.clipboard) {
-        navigator.clipboard.writeText(text).catch(function(){});
-      }
-      var origText = btnShare.textContent;
-      btnShare.textContent = '✅ Shared!';
-      setTimeout(function() { btnShare.textContent = origText; }, 1500);
-    };
+    if (btnShare) {
+      // Captured once: re-reading textContent on click would latch the
+      // "Shared!" label permanently if the button is clicked twice in a row.
+      var shareLabel = btnShare.textContent;
+      var shareResetTimer = null;
+      btnShare.onclick = function () {
+        playClick();
+        var text = 'I scored ' + formatNum(Math.floor(score || 0)) + ' in Subway Surfers! 🎮';
+        var url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text);
+        window.open(url, '_blank', 'width=600,height=400');
+        if (navigator.clipboard) {
+          navigator.clipboard.writeText(text).catch(function(){});
+        }
+        btnShare.textContent = '✅ Shared!';
+        if (shareResetTimer) clearTimeout(shareResetTimer);
+        shareResetTimer = setTimeout(function () {
+          btnShare.textContent = shareLabel;
+          shareResetTimer = null;
+        }, 1500);
+      };
+    }
     if (pauseVol) {
       pauseVol.oninput = function () {
         var s = getAudioSettings();

@@ -55,6 +55,14 @@ html, body {
   border: none;
 }
 
+/* Size the stage from CSS alone so the WebGL backing store is free to follow
+   devicePixelRatio without feeding back into layout. */
+#glcanvas {
+  width: min(1280px, calc(100vw - 40px), calc((100vh - 40px) * 16 / 9));
+  height: auto;
+  aspect-ratio: 16 / 9;
+}
+
 /* ===== Screen System ===== */
 .ui-screen {
   position: fixed; inset: 0;
@@ -107,7 +115,10 @@ html, body {
     0 20px 60px rgba(0,0,0,0.5),
     inset 0 1px 0 rgba(255,255,255,0.04);
   position: relative;
-  overflow: hidden;
+  /* Cards taller than the viewport (stats with every achievement listed) must
+     stay scrollable, or their trailing content and Back button are unreachable. */
+  overflow-x: hidden;
+  overflow-y: auto;
   max-height: calc(100vh - 32px);
 }
 .glass-card::before {
@@ -208,7 +219,7 @@ html, body {
 /* ===== Menu Layout ===== */
 .menu-buttons {
   display: flex; flex-direction: column;
-  gap: 14px; margin-top: 40px;
+  gap: 14px; margin: 40px auto 0;
   width: 100%; max-width: 320px;
 }
 .menu-buttons .btn { width: 100%; }
@@ -439,6 +450,12 @@ html, body {
 .modal-content {
   max-width: 520px;
 }
+/* Wider fixed sizing only where there is room for it — as inline styles these
+   outranked the small-screen rules below and overflowed narrow phones. */
+@media (min-width: 641px) {
+  .stats-card { min-width: 420px; max-width: 480px; }
+  .settings-card { min-width: 340px; }
+}
 .controls-grid {
   display: grid;
   grid-template-columns: auto 1fr;
@@ -663,19 +680,6 @@ html, body {
   0% { width: 0; height: 0; opacity: 1; }
   100% { width: 600px; height: 600px; opacity: 0; }
 }
-.new-record-text {
-  font-size: 18px; font-weight: 700;
-  letter-spacing: 4px; text-transform: uppercase;
-  color: var(--neon-gold);
-  text-shadow: 0 0 15px rgba(255,215,0,0.5);
-  animation: record-bounce 0.6s ease-out;
-}
-@keyframes record-bounce {
-  0% { transform: scale(0); opacity: 0; }
-  50% { transform: scale(1.2); opacity: 1; }
-  100% { transform: scale(1); opacity: 1; }
-}
-
 /* ===== FPS Counter ===== */
 #fps-counter {
   position: fixed; bottom: 12px; left: 12px;
@@ -811,6 +815,10 @@ html, body {
 .achievements-list {
   display: flex; flex-direction: column;
   gap: 8px;
+  /* Scroll the list rather than the whole card, so Back stays in reach */
+  max-height: min(300px, 38vh);
+  overflow-y: auto;
+  padding-right: 4px;
 }
 .achievement-item {
   display: flex; align-items: center; gap: 12px;
@@ -892,20 +900,11 @@ html, body {
   font-family: monospace;
 }
 
-/* ===== Responsive canvas sizing ===== */
-@media (max-width: 1320px) {
-  #game-stage canvas {
-    max-width: calc(100vw - 40px);
-    max-height: calc(100vh - 40px);
-  }
-}
-
 @media (max-width: 640px) {
   .glass-card {
     min-width: 0;
     width: calc(100vw - 32px);
     padding: 28px 20px !important;
-    overflow-y: auto;
   }
   .game-logo {
     font-size: 42px;
@@ -1005,4 +1004,173 @@ html, body {
   0%   { opacity: 1; transform: translate(-50%, -50%) scale(0.5); }
   25%  { opacity: 1; transform: translate(-50%, -50%) scale(1.3); }
   100% { opacity: 0; transform: translate(-50%, -180%) scale(1.0); }
+}
+
+/* ===== Splash / Intro Screen ===== */
+#splash-screen {
+  position: fixed; inset: 0;
+  z-index: 600;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  background: radial-gradient(ellipse at 50% 60%, #14141f 0%, var(--bg-primary) 70%);
+  overflow: hidden;
+  opacity: 1;
+  transition: opacity 0.6s cubic-bezier(0.4, 0, 0.2, 1);
+}
+#splash-screen.splash-out {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Perspective subway track rushing toward the viewer */
+.track-container {
+  position: absolute; inset: 0;
+  perspective: 320px;
+  perspective-origin: 50% 42%;
+  overflow: hidden;
+  opacity: 0.55;
+  mask-image: linear-gradient(to bottom, transparent 30%, #000 75%);
+  -webkit-mask-image: linear-gradient(to bottom, transparent 30%, #000 75%);
+}
+.track-lines, .sleepers {
+  position: absolute; top: 42%; left: 50%;
+  width: 900px; height: 900px;
+  margin-left: -450px;
+  transform-style: preserve-3d;
+  transform: rotateX(72deg);
+}
+.track-line {
+  position: absolute; top: 0; bottom: 0;
+  width: 3px;
+  background: linear-gradient(to top, var(--neon-cyan), transparent);
+  box-shadow: 0 0 12px rgba(5,217,232,0.6);
+}
+.track-line:nth-child(1) { left: 34%; }
+.track-line:nth-child(2) { left: 42%; }
+.track-line:nth-child(3) { left: 50%; background: linear-gradient(to top, var(--neon-pink), transparent); box-shadow: 0 0 14px rgba(255,42,109,0.6); }
+.track-line:nth-child(4) { left: 58%; }
+.track-line:nth-child(5) { left: 66%; }
+
+.sleeper {
+  position: absolute; left: 28%; right: 28%;
+  height: 6px;
+  border-radius: 3px;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.5), transparent);
+  animation: sleeper-rush 1.6s linear infinite;
+}
+.sleeper:nth-child(1) { animation-delay: 0s; }
+.sleeper:nth-child(2) { animation-delay: 0.32s; }
+.sleeper:nth-child(3) { animation-delay: 0.64s; }
+.sleeper:nth-child(4) { animation-delay: 0.96s; }
+.sleeper:nth-child(5) { animation-delay: 1.28s; }
+@keyframes sleeper-rush {
+  0%   { top: 0; opacity: 0; }
+  15%  { opacity: 0.9; }
+  100% { top: 100%; opacity: 0; }
+}
+
+/* Studio + title */
+.splash-content {
+  position: relative;
+  text-align: center;
+  z-index: 2;
+}
+.splash-studio {
+  font-size: 12px; font-weight: 500;
+  letter-spacing: 10px; text-transform: uppercase;
+  color: var(--text-secondary);
+  margin-bottom: 18px;
+  opacity: 0;
+  animation: splash-fade-up 0.9s cubic-bezier(0.4, 0, 0.2, 1) 0.2s both;
+}
+@keyframes splash-fade-up {
+  from { opacity: 0; transform: translateY(12px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+
+.splash-title {
+  position: relative;
+  font-size: clamp(40px, 9vw, 96px);
+  font-weight: 900;
+  letter-spacing: 4px; text-transform: uppercase;
+  line-height: 1;
+  color: #fff;
+  white-space: nowrap;
+}
+.splash-title-neon {
+  position: absolute; inset: 0;
+  color: var(--neon-pink);
+  filter: blur(14px);
+  opacity: 0.75;
+  pointer-events: none;
+}
+.splash-title .letter {
+  display: inline-block;
+  opacity: 0;
+  animation: letter-drop 0.55s cubic-bezier(0.2, 0.9, 0.3, 1.4) both;
+}
+@keyframes letter-drop {
+  0%   { opacity: 0; transform: translateY(-42px) rotateX(90deg); }
+  100% { opacity: 1; transform: translateY(0) rotateX(0); }
+}
+
+/* Loading bar */
+.splash-progress-wrapper {
+  position: relative; z-index: 2;
+  width: min(280px, 60vw);
+  height: 3px;
+  margin-top: 44px;
+  border-radius: 2px;
+  background: rgba(255,255,255,0.08);
+  overflow: hidden;
+}
+.splash-progress-bar {
+  height: 100%; width: 0;
+  border-radius: 2px;
+  background: linear-gradient(90deg, var(--neon-cyan), var(--neon-pink));
+  box-shadow: 0 0 12px rgba(255,42,109,0.5);
+  animation: splash-load 1.8s ease-out 0.5s forwards;
+}
+@keyframes splash-load {
+  from { width: 0; }
+  to   { width: 100%; }
+}
+.splash-progress-text {
+  position: relative; z-index: 2;
+  margin-top: 14px;
+  font-size: 10px; font-weight: 600;
+  font-family: monospace;
+  letter-spacing: 4px;
+  color: var(--text-muted);
+}
+
+.splash-hint {
+  position: absolute; z-index: 2;
+  bottom: max(48px, env(safe-area-inset-bottom));
+  font-size: 11px; font-weight: 600;
+  letter-spacing: 5px; text-transform: uppercase;
+  color: var(--text-secondary);
+  animation: hint-pulse 1.8s ease-in-out 1.4s infinite both;
+}
+@keyframes hint-pulse {
+  0%, 100% { opacity: 0.25; }
+  50%      { opacity: 1; }
+}
+
+/* Scanline / vignette wash over the whole intro */
+.glitch-overlay {
+  position: absolute; inset: 0;
+  z-index: 3;
+  pointer-events: none;
+  background:
+    repeating-linear-gradient(to bottom, rgba(255,255,255,0.025) 0 1px, transparent 1px 3px),
+    radial-gradient(ellipse at center, transparent 45%, rgba(0,0,0,0.7) 100%);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .sleeper, .splash-progress-bar, .splash-hint,
+  .splash-studio, .splash-title .letter {
+    animation-duration: 0.01ms !important;
+    animation-iteration-count: 1 !important;
+  }
 }

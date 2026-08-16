@@ -78,7 +78,7 @@
 
   <!-- ===== Stats ===== -->
   <div id="stats-screen" class="ui-screen hidden">
-    <div class="glass-card" style="min-width: 420px; max-width: 480px;">
+    <div class="glass-card stats-card">
       <div class="game-logo-small">Statistics</div>
       <div class="stats-grid">
         <div class="stat-box">
@@ -131,7 +131,7 @@
 
   <!-- ===== Settings ===== -->
   <div id="settings-screen" class="ui-screen hidden">
-    <div class="glass-card" style="min-width: 340px;">
+    <div class="glass-card settings-card">
       <div class="game-logo-small">Settings</div>
 
       <div class="volume-row">
@@ -405,11 +405,12 @@
       var start = Date.now();
       var duration = 1800;
       function tick() {
+        if (!pctEl || !pctEl.isConnected) return;
         var elapsed = Date.now() - start;
         var p = Math.min(100, Math.floor((elapsed / duration) * 100));
-        if (pctEl) pctEl.textContent = 'LOADING ' + p + '%';
+        pctEl.textContent = 'LOADING ' + p + '%';
         if (elapsed < duration) requestAnimationFrame(tick);
-        else if (pctEl) pctEl.textContent = 'LOADING 100%';
+        else pctEl.textContent = 'LOADING 100%';
       }
       setTimeout(tick, 500);
     })();
@@ -420,24 +421,32 @@
     var skipSplash = sessionStorage.getItem('ss_skipSplash') === 'true'
       || localStorage.getItem('ss_showIntro') === 'false';
     sessionStorage.removeItem('ss_skipSplash');
-    var splashDuration = skipSplash ? 0 : 3000;
     var splashDone = false;
-    function endSplash() {
+    // `immediate` is only true when called directly; as an event listener the
+    // first argument is an Event, so skipped-intro reloads stay instant while
+    // key/tap skips still cross-fade.
+    function endSplash(immediate) {
       if (splashDone) return;
       splashDone = true;
       var splash = document.getElementById('splash-screen');
-      if (splash) {
-        splash.style.display = 'none';
-        splash.innerHTML = '';
-      }
       var start = document.getElementById('start-screen');
       if (start && !window.ssGameStarted) start.classList.remove('hidden');
+      if (splash) {
+        if (immediate === true) {
+          splash.remove();
+        } else {
+          splash.classList.add('splash-out');
+          setTimeout(function () { splash.remove(); }, 700);
+        }
+      }
       document.removeEventListener('keydown', endSplash);
       document.removeEventListener('pointerdown', endSplash);
     }
-    setTimeout(endSplash, splashDuration);
-    // "PRESS ANY KEY TO START" — let any key or tap skip the splash
-    if (!skipSplash) {
+    if (skipSplash) {
+      endSplash(true);
+    } else {
+      setTimeout(endSplash, 3000);
+      // "PRESS ANY KEY TO START" — let any key or tap skip the splash
       document.addEventListener('keydown', endSplash);
       document.addEventListener('pointerdown', endSplash);
     }

@@ -48,12 +48,17 @@ var glow_cyan_texture, glow_pink_texture, glow_gold_texture;
 // Theme texture caches (preload both themes to avoid runtime reloads)
 var themeTextures = {1: {}, 2: {}};
 
-var cam_x = 0, cam_y = 12, cam_z = 40.0;
+var cam_x = 0, cam_y = 12, cam_z = 26.0;
 var cam_y_target = 5;
-var cam_z_target = 13.0;
+// The camera trails the player by a fixed distance. Driving cam_z off an
+// absolute world Z instead let it settle wherever the intro lerp happened to
+// cross, which pushed the player to the very top edge of the frame.
+var CAM_FOLLOW_DIST = 14;
+var camFollow = 30;   // dives to CAM_FOLLOW_DIST during the intro
+var camDip = 0;       // transient downward kick on landings
 var cameraShake = 0;
 var gameStartAnim = true;
-var target_x = 0, target_y = 0, target_z = cam_z - 10;
+var target_x = 0, target_y = 0;
 var d, startTime, policeCaughtUp, obstacle_hit_time, flash_start_time, boots_acquired, fb_acquired, hoverboard_acquired;
 var theme = 1;
 var theme_flag = 1;
@@ -84,6 +89,7 @@ var lastMilestone = 0;
 var nearMissTimer = 0;
 var envParticles = []; // ambient floating dust
 var hazardMarkers = [];
+var trainMarkers = []; // hazard markers that ride along with their train
 var dying = false;
 var deathTimer = 0;
 var freezeFrame = 0;
@@ -110,6 +116,18 @@ function safeVibrate(pattern) {
     if (navigator.vibrate && hasUserActivation()) {
         navigator.vibrate(pattern);
     }
+}
+
+// Sustained background tints (power-up glow, proximity warnings) would
+// otherwise call flashScreen on every frame, and each call forces a
+// synchronous layout. Rate-limit them; they are far too faint to strobe.
+var lastAmbientTint = 0;
+function ambientTint(color, duration) {
+    if (typeof flashScreen !== 'function') return;
+    var now = Date.now();
+    if (now - lastAmbientTint < 100) return;
+    lastAmbientTint = now;
+    flashScreen(color, duration);
 }
 
 function initSfx() {
@@ -332,12 +350,14 @@ function laneFromRandom() {
 }
 
 function addHazardMarker(x, z, type) {
-  hazardMarkers.push({
+  var marker = {
     x: x,
     z: z,
     type: type || 'danger',
     pulse: Math.random() * Math.PI * 2
-  });
+  };
+  hazardMarkers.push(marker);
+  return marker;
 }
 
 main();
@@ -629,7 +649,7 @@ function main() {
     y = -4;
     z = - (i + 1) * 79;
     x = keepOpeningLaneSafe(x, z);
-    addHazardMarker(x, z + 18, 'train');
+    trainMarkers.push(addHazardMarker(x, z + 18, 'train'));
     // Train body: front, top, left, right, bottom, back panels
     trainF.push(new Train(gl, [x, y, z + 10], 10, 3, 0.1));
     trainT.push(new Train(gl, [x, y + 5, z], 0.1, 3, 20));
@@ -795,7 +815,9 @@ function main() {
 
     // Difficulty scaling: speed slowly increases with distance
     var distance = -player.pos[2];
-    score = distance + coins_collected;
+    // The player keeps sliding through the death slow-mo; lock the score at
+    // the moment of impact so the result screen matches what was on the HUD.
+    if (!dying) score = distance + coins_collected;
     player_speed = 0.5 + Math.min(0.5, distance / 3000);
     // Update distance progress bar
     if (_distFill && _distText) {
@@ -812,11 +834,10 @@ function main() {
       deathTimer += deltaTime;
       player.speedz *= 0.85;
       cameraShake *= 0.9;
-      cam_z_target += 0.15; // camera pulls back on death
+      camFollow += 0.15; // camera pulls back on death
       if (deathTimer > 0.8) {
         dying = false;
         deathTimer = 0;
-        cam_z_target = 13.0;
         if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); }
         return;
       }
@@ -860,27 +881,32 @@ function main() {
 
     // move forward
     var effectiveSpeed = player.speedz * timeDilation;
+    // Thin obstacles (ropes, jump bars) are narrower than one frame of travel,
+    // so their hit tests sweep the segment the player crossed this frame.
+    var prevPlayerZ = player.pos[2];
     player.pos[2] -= effectiveSpeed;
-    cam_z -= effectiveSpeed;
     dog.pos[2] -= effectiveSpeed;
-
-    // smooth camera vertical follow
-    var camDiff = cam_y_target - cam_y;
-    cam_y += camDiff * 0.08;
-    target_y = cam_y - 7.2;
 
     // start-of-game camera push-in animation
     if (gameStartAnim) {
-      cam_z += (cam_z_target - cam_z) * 0.025;
-      cam_y += (cam_y_target - cam_y) * 0.04;
-      currentFov += (45 - currentFov) * 0.04;
-      if (Math.abs(cam_z - cam_z_target) < 0.1) {
-        cam_z = cam_z_target;
-        cam_y = cam_y_target;
+      camFollow += (CAM_FOLLOW_DIST - camFollow) * 0.08;
+      currentFov += (45 - currentFov) * 0.08;
+      if (camFollow - CAM_FOLLOW_DIST < 0.05) {
+        camFollow = CAM_FOLLOW_DIST;
         currentFov = 45;
         gameStartAnim = false;
       }
     }
+
+    // smooth camera vertical follow, with the landing dip springing back
+    if (camDip > 0) {
+      camDip *= 0.85;
+      if (camDip < 0.005) camDip = 0;
+    }
+    var camDiff = (cam_y_target - camDip) - cam_y;
+    cam_y += camDiff * 0.08;
+    target_y = cam_y - 7.2;
+    cam_z = player.pos[2] + camFollow;
 
     // recover tilt back to upright
     if (player.tilt > 0) { player.tilt -= 0.02; if (player.tilt < 0) player.tilt = 0; }
@@ -893,10 +919,10 @@ function main() {
       police.speedz = player_speed;
     police.pos[2] -= police.speedz
     // Police approaching warning (first 5 seconds after obstacle hit)
-    if (policeTimer > 0 && policeTimer < 5 && typeof flashScreen === 'function') {
+    if (policeTimer > 0 && policeTimer < 5) {
       var warnIntensity = 1.0 - policeTimer / 5;
       if (Math.sin(Date.now() * 0.008) > 0.8) {
-        flashScreen('rgba(255,0,0,' + (warnIntensity * 0.08) + ')', 0.05);
+        ambientTint('rgba(255,0,0,' + (warnIntensity * 0.08) + ')', 0.2);
       }
     }
 
@@ -944,17 +970,17 @@ function main() {
     // x3 multiplier golden aura pulse
     if (scoreMultiplier >= 3) {
       var pulsePhase = Date.now() * 0.003;
-      if (Math.sin(pulsePhase) > 0.95 && typeof flashScreen === 'function') {
-        flashScreen('rgba(255,215,0,0.08)', 0.1);
+      if (Math.sin(pulsePhase) > 0.95) {
+        ambientTint('rgba(255,215,0,0.08)', 0.2);
       }
     }
 
     // Power-up active screen tint
-    if (player.hoverboard && typeof flashScreen === 'function') {
-      flashScreen('rgba(0,255,136,0.03)', 0.05);
+    if (player.hoverboard) {
+      ambientTint('rgba(0,255,136,0.03)', 0.2);
     }
-    if (player.fly_boost && typeof flashScreen === 'function') {
-      flashScreen('rgba(255,42,109,0.04)', 0.05);
+    if (player.fly_boost) {
+      ambientTint('rgba(255,42,109,0.04)', 0.2);
     }
 
     // Train proximity warning (red edge flash when train is close behind on same track)
@@ -963,7 +989,7 @@ function main() {
       if (trainF[i].pos[0] == player.pos[0]) {
         var zdist_warn = player.pos[2] - trainF[i].pos[2];
         if (zdist_warn > 5 && zdist_warn < 20) {
-          if (typeof flashScreen === 'function') flashScreen('rgba(255,0,0,0.06)', 0.08);
+          ambientTint('rgba(255,0,0,0.06)', 0.2);
           break;
         }
       }
@@ -1021,8 +1047,9 @@ function main() {
           if (player.pos[1] < -4 && !ducking) {
             if (wasInAir) {
               wasInAir = false;
-              // Landing camera dip
-              cam_y_target -= 0.4;
+              // Landing camera dip (springs back; permanently lowering
+              // cam_y_target would sink the camera through the track)
+              camDip = 0.4;
               if (typeof playBumpSound === 'function') playBumpSound();
               for (var p = 0; p < 8; p++) {
                 var vx = (Math.random() - 0.5) * 3.0;
@@ -1099,6 +1126,8 @@ function main() {
       for (var j = 2; j < 6; j++) {
         trainExtra[i * 6 + j].rotation += tSpeed * 0.5;
       }
+      // Keep the ground warning decal under the train it warns about
+      if (trainMarkers[i]) trainMarkers[i].z += tSpeed;
     }
 
     // coins collecting + magnet pull effect
@@ -1196,17 +1225,25 @@ function main() {
       }
     }
 
-    // Train proximity rumble intensity
+    // Train proximity rumble. Computed outside the hoverboard guard below —
+    // otherwise an in-progress rumble would hold its volume for the whole
+    // 10s power-up instead of fading as the train passes.
     var rumbleIntensity = 0;
+    for (var i = 0; i < num_trains; i++) {
+      if (player.pos[0] == trainF[i].pos[0]) {
+        var zdistRumble = player.pos[2] - trainF[i].pos[2];
+        if (zdistRumble > -25 && zdistRumble < 5) {
+          rumbleIntensity = Math.max(rumbleIntensity, 1.0 - Math.abs(zdistRumble + 5) / 20);
+        }
+      }
+    }
+    if (typeof updateTrainRumble === 'function') updateTrainRumble(rumbleIntensity);
 
     if (!player.hoverboard) {
       // collision with train
       for (var i = 0; i < num_trains; i++) {
         if (player.pos[0] == trainF[i].pos[0]) {
           var zdistTrain = player.pos[2] - trainF[i].pos[2];
-          if (zdistTrain > -25 && zdistTrain < 5) {
-            rumbleIntensity = Math.max(rumbleIntensity, 1.0 - Math.abs(zdistTrain + 5) / 20);
-          }
           if (player.pos[1] >= trainF[i].pos[1] - 4 && player.pos[1] <= trainF[i].pos[1] + 4) {
             if (player.pos[2] >= trainF[i].pos[2] - 18 && player.pos[2] <= trainF[i].pos[2]) {
               if (dying) break;
@@ -1245,9 +1282,6 @@ function main() {
           }
         }
       }
-
-      // Update train rumble audio
-      if (typeof updateTrainRumble === 'function') updateTrainRumble(rumbleIntensity);
 
       // collision with boxes
       var num_boxes = boxes.length;
@@ -1307,7 +1341,7 @@ function main() {
         if (i != obstacle_hit || obstacle_hit_type != 'duck') {
           if (player.pos[0] == duck_obs_stop[i].pos[0]) {
             if (player.pos[1] >= duck_obs_stop[i].pos[1] - 4 && player.pos[1] <= duck_obs_stop[i].pos[1] + 4) {
-              if (duck_obs_stop[i].pos[2] >= player.pos[2] - 0.7 && duck_obs_stop[i].pos[2] <= player.pos[2] + 0.7) {
+              if (duck_obs_stop[i].pos[2] >= player.pos[2] - 0.7 && duck_obs_stop[i].pos[2] <= prevPlayerZ + 0.7) {
                 if (dying) break;
                 d = new Date();
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
@@ -1336,7 +1370,7 @@ function main() {
         if (i != obstacle_hit || obstacle_hit_type != 'jump') {
           if (player.pos[0] == jump_obs[i].pos[0]) {
             if (player.pos[1] >= jump_obs[i].pos[1] - 2 && player.pos[1] <= jump_obs[i].pos[1] + 2) {
-              if (player.pos[2] <= jump_obs[i].pos[2] + 0.2 && player.pos[2] >= jump_obs[i].pos[2] - 0.2) {
+              if (jump_obs[i].pos[2] <= prevPlayerZ + 0.2 && jump_obs[i].pos[2] >= player.pos[2] - 0.2) {
                 if (dying) break;
                 d = new Date();
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
@@ -1365,7 +1399,7 @@ function main() {
       for (var i = 0; i < num_rope; i++) {
         if (i != obstacle_hit || obstacle_hit_type != 'rope') {
           if (rope_stop[i].pos[1] <= player.pos[1] + 0.5 && rope_stop[i].pos[1] >= player.pos[1] - 0.5) {
-            if (player.pos[2] <= rope_stop[i].pos[2] + 0.02 && player.pos[2] >= rope_stop[i].pos[2] - 0.02) {
+            if (rope_stop[i].pos[2] <= prevPlayerZ + 0.02 && rope_stop[i].pos[2] >= player.pos[2] - 0.02) {
               if (dying) break;
               d = new Date();
               if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
@@ -1701,7 +1735,23 @@ function worldToScreen(wx, wy, wz) {
   };
 }
 
+// Match the WebGL backing store to the CSS box at device resolution, so the
+// scene stays sharp on HiDPI displays and follows window resizes.
+function resizeCanvasToDisplay(gl) {
+  var canvas = gl.canvas;
+  var dpr = Math.min(window.devicePixelRatio || 1, 2);
+  var w = Math.round(canvas.clientWidth * dpr);
+  var h = Math.round(canvas.clientHeight * dpr);
+  if (!w || !h) return;
+  if (canvas.width !== w || canvas.height !== h) {
+    canvas.width = w;
+    canvas.height = h;
+  }
+  gl.viewport(0, 0, w, h);
+}
+
 function drawScene(gl, programInfo, deltaTime) {
+  resizeCanvasToDisplay(gl);
 
   if (theme_flag == 1) {
     applyTheme(theme);
