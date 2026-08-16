@@ -2,18 +2,15 @@
 /// <reference path="webgl.d.ts" />
 
 let City = class {
-    constructor(gl, pos) {
-        this.rotation = 0.0;
-        this.pos = pos;
-        var seed = Math.abs(Math.sin(pos[2] * 0.173));
+    // Silhouette is baked into the vertices from the block's Z, so a recycled
+    // block has to rebuild it or the endless skyline repeats with the pool.
+    static silhouette(z) {
+        var seed = Math.abs(Math.sin(z * 0.173));
         var rightTop = 6.0 + seed * 10.0;
-        var leftTop = 7.0 + Math.abs(Math.cos(pos[2] * 0.127)) * 9.0;
+        var leftTop = 7.0 + Math.abs(Math.cos(z * 0.127)) * 9.0;
         var rightInset = 8.2 + seed * 1.2;
-        var leftInset = 8.2 + Math.abs(Math.sin(pos[2] * 0.091)) * 1.2;
-
-        this.positionBuffer = gl.createBuffer();
-        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
-        this.positions = [
+        var leftInset = 8.2 + Math.abs(Math.sin(z * 0.091)) * 1.2;
+        return [
             // Right face
             -rightInset, -10.0, 5.0,
             -rightInset, -10.0, -5.0,
@@ -25,6 +22,22 @@ let City = class {
             leftInset, leftTop, -5.0,
             leftInset, leftTop, 5.0,
         ];
+    }
+
+    reseed(gl, z) {
+        this.pos[2] = z;
+        this.positions = City.silhouette(z);
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
+    }
+
+    constructor(gl, pos) {
+        this.rotation = 0.0;
+        this.pos = pos;
+
+        this.positionBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, this.positionBuffer);
+        this.positions = City.silhouette(pos[2]);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(this.positions), gl.STATIC_DRAW);
 
         const normalBuffer = gl.createBuffer();

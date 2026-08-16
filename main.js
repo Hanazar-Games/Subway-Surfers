@@ -89,7 +89,30 @@ var lastMilestone = 0;
 var nearMissTimer = 0;
 var envParticles = []; // ambient floating dust
 var hazardMarkers = [];
-var trainMarkers = []; // hazard markers that ride along with their train
+// Each obstacle owns its ground warning decal so both recycle together.
+var trainMarkers = [], boxMarkers = [], manholeMarkers = [];
+var duckMarkers = [], jumpMarkers = [], ropeMarkers = [];
+var coinGroups = []; // coins recycle a whole run at a time
+var runDistance = 0; // frozen alongside score when the player dies
+
+// ===== Endless streaming =====
+// Ground and backdrop are fixed-size pools cycled behind the camera; obstacles
+// keep their original spacing but are re-placed ahead once they fall behind.
+var TRACK_POOL = 32, TRACK_SPACING = 5;
+var WALL_POOL = 32, WALL_SPACING = 5;
+var CITY_POOL = 20, CITY_SPACING = 10;
+var WORLD_START_Z = 40; // ground begins above the intro camera, not at z=0
+var spawnFrontier = {}; // furthest Z handed out per obstacle type
+
+// Hand out the next slot for a type, keeping its original spacing and never
+// placing anything close enough for the player to run into unsighted.
+function nextSpawnZ(key, spacing, minAhead) {
+  var z = (spawnFrontier[key] || 0) - spacing;
+  var limit = player.pos[2] - (minAhead || 220);
+  if (z > limit) z = limit;
+  spawnFrontier[key] = z;
+  return z;
+}
 var dying = false;
 var deathTimer = 0;
 var freezeFrame = 0;
@@ -268,7 +291,9 @@ function updateTrainRumble(intensity) {
     trainRumbleOsc.frequency.setTargetAtTime(40 + intensity * 15, t, 0.05);
 }
 
-function playVictorySound() {
+// Fanfare for every 500m cleared — an endless run has no finish line, so the
+// milestones are what mark progress.
+function playMilestoneFanfare() {
     initSfx();
     resumeSfx();
     if (!audioCtx) return;
@@ -360,6 +385,142 @@ function addHazardMarker(x, z, type) {
   return marker;
 }
 
+// ===== Placement helpers (shared by initial layout and endless recycling) =====
+
+function placeCoinGroup(group, startZ) {
+  var x = laneFromRandom();
+  var pattern = Math.floor(Math.random() * 3);
+  var n = group.length;
+  var z = startZ;
+  for (var k = 0; k < n; k++) {
+    var coinY = -4;
+    if (pattern == 1) coinY = -4 + Math.sin(k / Math.max(1, n - 1) * Math.PI) * 2.4;
+    else if (pattern == 2 && k % 3 == 1) coinY = -4 + 1.4;
+    group[k].pos[0] = x;
+    group[k].pos[1] = coinY;
+    group[k].pos[2] = z;
+    group[k].exist = true;
+    group[k].speed = 0.1;
+    z -= 2.5;
+  }
+  spawnFrontier.coin = z;
+  return z;
+}
+
+function placeTrain(i, x, z) {
+  var y = -4;
+  trainF[i].pos[0] = x; trainF[i].pos[1] = y; trainF[i].pos[2] = z + 10;
+  trainT[i].pos[0] = x; trainT[i].pos[1] = y + 5; trainT[i].pos[2] = z;
+  trainL[i].pos[0] = x - 1.5; trainL[i].pos[1] = y; trainL[i].pos[2] = z;
+  trainR[i].pos[0] = x + 1.5; trainR[i].pos[1] = y; trainR[i].pos[2] = z;
+  var e = trainExtra;
+  e[i * 6 + 0].pos[0] = x;       e[i * 6 + 0].pos[1] = y - 5;   e[i * 6 + 0].pos[2] = z;
+  e[i * 6 + 1].pos[0] = x;       e[i * 6 + 1].pos[1] = y;       e[i * 6 + 1].pos[2] = z - 10;
+  e[i * 6 + 2].pos[0] = x - 1.2; e[i * 6 + 2].pos[1] = y - 5.4; e[i * 6 + 2].pos[2] = z + 7;
+  e[i * 6 + 3].pos[0] = x + 1.2; e[i * 6 + 3].pos[1] = y - 5.4; e[i * 6 + 3].pos[2] = z + 7;
+  e[i * 6 + 4].pos[0] = x - 1.2; e[i * 6 + 4].pos[1] = y - 5.4; e[i * 6 + 4].pos[2] = z - 7;
+  e[i * 6 + 5].pos[0] = x + 1.2; e[i * 6 + 5].pos[1] = y - 5.4; e[i * 6 + 5].pos[2] = z - 7;
+  if (trainMarkers[i]) { trainMarkers[i].x = x; trainMarkers[i].z = z + 18; }
+  var j = Math.floor(Math.random() * 3);
+  train_speeds[i] = j == 0 ? 0.2 : (j == 1 ? 0.5 : 0.7);
+}
+
+function placeBox(i, x, z) {
+  boxes[i].pos[0] = x; boxes[i].pos[1] = -3.4; boxes[i].pos[2] = z;
+  if (boxMarkers[i]) { boxMarkers[i].x = x; boxMarkers[i].z = z + 8; }
+}
+
+function placeManhole(i, x, z) {
+  manholes[i].pos[0] = x; manholes[i].pos[1] = -5.1; manholes[i].pos[2] = z;
+  if (manholeMarkers[i]) { manholeMarkers[i].x = x; manholeMarkers[i].z = z + 8; }
+}
+
+function placeDuck(i, x, z) {
+  duck_obs_stop[i].pos[0] = x;       duck_obs_stop[i].pos[1] = 0;  duck_obs_stop[i].pos[2] = z;
+  duck_obs_stand1[i].pos[0] = x + 1.5; duck_obs_stand1[i].pos[1] = -2; duck_obs_stand1[i].pos[2] = z;
+  duck_obs_stand2[i].pos[0] = x - 1.5; duck_obs_stand2[i].pos[1] = -2; duck_obs_stand2[i].pos[2] = z;
+  if (duckMarkers[i]) { duckMarkers[i].x = x; duckMarkers[i].z = z + 7; }
+}
+
+function placeJump(i, x, z) {
+  jump_obs[i].pos[0] = x; jump_obs[i].pos[1] = -3; jump_obs[i].pos[2] = z;
+  if (jumpMarkers[i]) { jumpMarkers[i].x = x; jumpMarkers[i].z = z + 7; }
+}
+
+function placeRope(i, z) {
+  rope_stand1[i].pos[2] = z;
+  rope_stand2[i].pos[2] = z;
+  rope_stop[i].pos[2] = z;
+  if (ropeMarkers[i]) ropeMarkers[i].z = z + 8;
+}
+
+function placePowerUp(obj, x, z) {
+  obj.pos[0] = x; obj.pos[2] = z;
+  obj.exist = true;
+}
+
+// Recycle anything that has fallen behind the camera back out in front, so the
+// run never reaches the end of the world.
+function streamWorld(gl, bgDrift) {
+  var behind = cam_z + 20;
+  var i;
+
+  var trackSpan = TRACK_POOL * TRACK_SPACING;
+  for (i = 0; i < TRACK_POOL; i++) {
+    if (track1[i].pos[2] > behind) {
+      track1[i].pos[2] -= trackSpan;
+      track2[i].pos[2] -= trackSpan;
+      track3[i].pos[2] -= trackSpan;
+    }
+  }
+
+  // Backdrop lags the foreground slightly, which is what sells the parallax
+  var wallSpan = WALL_POOL * WALL_SPACING;
+  for (i = 0; i < WALL_POOL; i++) {
+    wall[i].pos[2] += bgDrift;
+    if (wall[i].pos[2] > behind) wall[i].pos[2] -= wallSpan;
+  }
+  var citySpan = CITY_POOL * CITY_SPACING;
+  for (i = 0; i < CITY_POOL; i++) {
+    city[i].pos[2] += bgDrift;
+    // reseed rebuilds the skyline so the pool doesn't visibly repeat
+    if (city[i].pos[2] > behind) city[i].reseed(gl, city[i].pos[2] - citySpan);
+  }
+
+  for (i = 0; i < coinGroups.length; i++) {
+    var g = coinGroups[i];
+    if (g[g.length - 1].pos[2] > behind) {
+      var startZ = (spawnFrontier.coin || 0) - (10 + Math.random() * 25);
+      var limit = player.pos[2] - 220;
+      placeCoinGroup(g, startZ > limit ? limit : startZ);
+    }
+  }
+  // Flying-boost coins are spawned ad hoc; drop the ones we've run past or the
+  // array grows without bound over a long run.
+  for (i = coins.length - 1; i >= 0; i--) {
+    if (coins[i].temp && coins[i].pos[2] > behind) coins.splice(i, 1);
+  }
+
+  for (i = 0; i < trainF.length; i++)
+    if (trainF[i].pos[2] > behind) placeTrain(i, laneFromRandom(), nextSpawnZ('train', 79));
+  for (i = 0; i < boxes.length; i++)
+    if (boxes[i].pos[2] > behind) placeBox(i, laneFromRandom(), nextSpawnZ('box', 73));
+  for (i = 0; i < manholes.length; i++)
+    if (manholes[i].pos[2] > behind) placeManhole(i, laneFromRandom(), nextSpawnZ('manhole', 151));
+  for (i = 0; i < duck_obs_stop.length; i++)
+    if (duck_obs_stop[i].pos[2] > behind) placeDuck(i, laneFromRandom(), nextSpawnZ('duck', 61));
+  for (i = 0; i < jump_obs.length; i++)
+    if (jump_obs[i].pos[2] > behind) placeJump(i, laneFromRandom(), nextSpawnZ('jump', 53));
+  for (i = 0; i < rope_stop.length; i++)
+    if (rope_stop[i].pos[2] > behind) placeRope(i, nextSpawnZ('rope', 127));
+  for (i = 0; i < boots.length; i++)
+    if (boots[i].pos[2] > behind) placePowerUp(boots[i], laneFromRandom(), nextSpawnZ('boots', 103));
+  for (i = 0; i < flying_boost.length; i++)
+    if (flying_boost[i].pos[2] > behind) placePowerUp(flying_boost[i], laneFromRandom(), nextSpawnZ('fly', 157));
+  for (i = 0; i < hoverboard.length; i++)
+    if (hoverboard[i].pos[2] > behind) placePowerUp(hoverboard[i], laneFromRandom(), nextSpawnZ('hover', 250));
+}
+
 main();
 
 function main() {
@@ -395,6 +556,7 @@ function main() {
   uniform mat4 uNormalMatrix;
   uniform mat4 uModelViewMatrix;
   uniform mat4 uProjectionMatrix;
+  uniform highp float uCamZ;
 
   varying highp vec2 vTextureCoord;
   varying highp vec3 vLighting;
@@ -414,8 +576,11 @@ function main() {
     highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
     vLighting = ambientLight + (directionalLightColor * directional);
 
-    // Fog depth = distance from camera in view space
-    vFogDepth = -(uModelViewMatrix * aVertexPosition).z;
+    // uModelViewMatrix is only the model matrix here (the view matrix is
+    // folded into uProjectionMatrix), so measure fog against the camera
+    // rather than against world origin — otherwise everything past ~90m
+    // saturates to solid fog colour.
+    vFogDepth = uCamZ - (uModelViewMatrix * aVertexPosition).z;
   }
 `;
 
@@ -427,6 +592,7 @@ function main() {
   uniform mat4 uNormalMatrix;
   uniform mat4 uModelViewMatrix;
   uniform mat4 uProjectionMatrix;
+  uniform highp float uCamZ;
 
   varying highp vec2 vTextureCoord;
   varying highp vec3 vLighting;
@@ -446,7 +612,7 @@ function main() {
     highp float directional = max(dot(transformedNormal.xyz, directionalVector), 1.0);
     vLighting = ambientLight + (directionalLightColor * directional);
 
-    vFogDepth = -(uModelViewMatrix * aVertexPosition).z;
+    vFogDepth = uCamZ - (uModelViewMatrix * aVertexPosition).z;
   }
 `;
 
@@ -563,6 +729,7 @@ function main() {
       uFogFar: gl.getUniformLocation(shaderProgram, 'uFogFar'),
       uGlow: gl.getUniformLocation(shaderProgram, 'uGlow'),
       uAlpha: gl.getUniformLocation(shaderProgram, 'uAlpha'),
+      uCamZ: gl.getUniformLocation(shaderProgram, 'uCamZ'),
     },
   };
 
@@ -583,6 +750,7 @@ function main() {
       uFogFar: gl.getUniformLocation(shaderProgrambw, 'uFogFar'),
       uGlow: gl.getUniformLocation(shaderProgrambw, 'uGlow'),
       uAlpha: gl.getUniformLocation(shaderProgrambw, 'uAlpha'),
+      uCamZ: gl.getUniformLocation(shaderProgrambw, 'uCamZ'),
     },
   };
 
@@ -603,18 +771,22 @@ function main() {
       uFogFar: gl.getUniformLocation(shaderProgramhigh, 'uFogFar'),
       uGlow: gl.getUniformLocation(shaderProgramhigh, 'uGlow'),
       uAlpha: gl.getUniformLocation(shaderProgramhigh, 'uAlpha'),
+      uCamZ: gl.getUniformLocation(shaderProgramhigh, 'uCamZ'),
     },
   };
 
-  for (var i = 0; i < 1000; i += 1) {
-    wall.push(new Wall(gl, [0, 0, -i * 5]));
-    city.push(new City(gl, [0, 5, -i * 10]));
+  for (var i = 0; i < WALL_POOL; i += 1) {
+    wall.push(new Wall(gl, [0, 0, WORLD_START_Z - i * WALL_SPACING]));
+  }
+  for (var i = 0; i < CITY_POOL; i += 1) {
+    city.push(new City(gl, [0, 5, WORLD_START_Z - i * CITY_SPACING]));
   }
 
-  for (var i = 0; i < 1000; i += 1) {
-    track1.push(new Track(gl, [-6, 0, -i * 5]));
-    track2.push(new Track(gl, [0, 0, -i * 5]));
-    track3.push(new Track(gl, [6, 0, -i * 5]));
+  for (var i = 0; i < TRACK_POOL; i += 1) {
+    var tz = WORLD_START_Z - i * TRACK_SPACING;
+    track1.push(new Track(gl, [-6, 0, tz]));
+    track2.push(new Track(gl, [0, 0, tz]));
+    track3.push(new Track(gl, [6, 0, tz]));
   }
 
   player = new Player(gl, [-6, -4, -4]);
@@ -625,22 +797,15 @@ function main() {
   dog.speedz = player_speed;
 
   for (var i = 0; i < 50; i++) {
-    var x, y, z;
-    x = laneFromRandom();
-    y = -4;
-    if (i == 0)
-      z = -30;
-    else
-      z = coins[coins.length - 1].pos[2] - (Math.random() * 30 - 15);
     var num_coins = Math.floor(Math.random() * 5 + 5);
-    var pattern = Math.floor(Math.random() * 3);
+    var group = [];
     for (var k = 0; k < num_coins; k++) {
-      var coinY = y;
-      if (pattern == 1) coinY = y + Math.sin(k / Math.max(1, num_coins - 1) * Math.PI) * 2.4;
-      else if (pattern == 2 && k % 3 == 1) coinY = y + 1.4;
-      coins.push(new Coin(gl, [x, coinY, z]));
-      z -= 2.5;
+      var c = new Coin(gl, [0, -4, 0]);
+      group.push(c);
+      coins.push(c);
     }
+    coinGroups.push(group);
+    placeCoinGroup(group, i === 0 ? -30 : spawnFrontier.coin - (10 + Math.random() * 25));
   }
 
   for (var i = 0; i < 10; i++) {
@@ -649,6 +814,7 @@ function main() {
     y = -4;
     z = - (i + 1) * 79;
     x = keepOpeningLaneSafe(x, z);
+    spawnFrontier.train = z;
     trainMarkers.push(addHazardMarker(x, z + 18, 'train'));
     // Train body: front, top, left, right, bottom, back panels
     trainF.push(new Train(gl, [x, y, z + 10], 10, 3, 0.1));
@@ -691,9 +857,10 @@ function main() {
     y = -3.4;
     z = - i * 73 - 40;
     x = keepOpeningLaneSafe(x, z);
-    addHazardMarker(x, z + 8, 'box');
+    boxMarkers.push(addHazardMarker(x, z + 8, 'box'));
     // Box obstacle (more crate-like proportions)
     boxes.push(new Box(gl, [x, y, z], 3.5, 4.5, 5));
+    spawnFrontier.box = z;
   }
 
   for (var i = 0; i < 10; i++) {
@@ -702,8 +869,9 @@ function main() {
     y = -5.1;
     z = - (i + 1) * 151;
     x = keepOpeningLaneSafe(x, z);
-    addHazardMarker(x, z + 8, 'gap');
+    manholeMarkers.push(addHazardMarker(x, z + 8, 'gap'));
     manholes.push(new Manhole(gl, [x, y, z], 0.6, 4, 4));
+    spawnFrontier.manhole = z;
   }
 
   for (var i = 0; i < 20; i++) {
@@ -712,10 +880,11 @@ function main() {
     y = 0;
     z = -i * 61 - 30;
     x = keepOpeningLaneSafe(x, z);
-    addHazardMarker(x, z + 7, 'duck');
+    duckMarkers.push(addHazardMarker(x, z + 7, 'duck'));
     duck_obs_stop.push(new Stop(gl, [x, y, z], 7, 3, 0.1));
     duck_obs_stand1.push(new Stand(gl, [x + 1.5, y - 2, z], 6, 0.2, 0.1));
     duck_obs_stand2.push(new Stand(gl, [x - 1.5, y - 2, z], 6, 0.2, 0.1));
+    spawnFrontier.duck = z;
   }
 
   for (var i = 0; i < 20; i++) {
@@ -724,18 +893,20 @@ function main() {
     y = -3;
     z = -(i + 1) * 53;
     x = keepOpeningLaneSafe(x, z);
-    addHazardMarker(x, z + 7, 'jump');
+    jumpMarkers.push(addHazardMarker(x, z + 7, 'jump'));
     jump_obs.push(new Stop(gl, [x, y, z], 3, 3, 1));
+    spawnFrontier.jump = z;
   }
 
   for (var i = 0; i < 6; i++) {
     var x, y, z;
     y = -3.5;
     z = -(i + 1) * 127;
-    addHazardMarker(0, z + 8, 'rope');
+    ropeMarkers.push(addHazardMarker(0, z + 8, 'rope'));
     rope_stand1.push(new Stand(gl, [-8, y - 1, z], 2, 0.4, 0.1));
     rope_stand2.push(new Stand(gl, [8, y - 1, z], 2, 0.4, 0.1));
     rope_stop.push(new Stop(gl, [0, y, z], 0.3, 16, 0.1));
+    spawnFrontier.rope = z;
   }
 
   for (var i = 0; i < 5; i++) {
@@ -744,6 +915,7 @@ function main() {
     y = 0;
     z = -(i + 1) * 103;
     boots.push(new Boots(gl, [x, y, z], 1.5, 1.5, 1.5));
+    spawnFrontier.boots = z;
   }
 
   for (var i = 0; i < 5; i++) {
@@ -752,10 +924,12 @@ function main() {
     y = 0;
     z = -i * 157 - 60;
     flying_boost.push(new FlyingBoost(gl, [x, y, z], 1.5, 1.5, 1.5));
+    spawnFrontier.fly = z;
   }
 
   hoverboard.push(new Hoverboard(gl, [0, 0, -150], 1.5, 1.5, 1.5));
   hoverboard.push(new Hoverboard(gl, [0, 0, -400], 1.5, 1.5, 1.5));
+  spawnFrontier.hover = -400;
 
   // Initialize ambient dust particles (small golden motes floating in light shafts)
   for (var i = 0; i < 30; i++) {
@@ -817,13 +991,15 @@ function main() {
     var distance = -player.pos[2];
     // The player keeps sliding through the death slow-mo; lock the score at
     // the moment of impact so the result screen matches what was on the HUD.
-    if (!dying) score = distance + coins_collected;
+    if (!dying) {
+      score = distance + coins_collected;
+      runDistance = distance;
+    }
     player_speed = 0.5 + Math.min(0.5, distance / 3000);
-    // Update distance progress bar
+    // Endless run: the bar fills toward the next 500m marker
     if (_distFill && _distText) {
-      var progress = Math.min(100, (distance / 800) * 100);
-      _distFill.style.width = progress + '%';
-      _distText.textContent = Math.floor(distance) + 'm / 800m';
+      _distFill.style.width = ((distance % 500) / 5) + '%';
+      _distText.textContent = Math.floor(distance) + 'm';
     }
     if (obstacle_hit == -1) {
       player.speedz = player_speed;
@@ -838,7 +1014,7 @@ function main() {
       if (deathTimer > 0.8) {
         dying = false;
         deathTimer = 0;
-        if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); }
+        if (typeof uiGameOver === 'function') { uiGameOver(score, coins_collected, runDistance); }
         return;
       }
       // Vignette darkening via screen flash overlay
@@ -908,6 +1084,9 @@ function main() {
     target_y = cam_y - 7.2;
     cam_z = player.pos[2] + camFollow;
 
+    // Endless world: everything behind the camera comes back out in front
+    streamWorld(gl, effectiveSpeed * 0.06);
+
     // recover tilt back to upright
     if (player.tilt > 0) { player.tilt -= 0.02; if (player.tilt < 0) player.tilt = 0; }
     if (player.tilt < 0) { player.tilt += 0.02; if (player.tilt > 0) player.tilt = 0; }
@@ -955,6 +1134,12 @@ function main() {
       if (typeof showComboText === 'function') {
         var rect = document.getElementById('glcanvas').getBoundingClientRect();
         showComboText(lastMilestone + 'm', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
+      }
+      // Every 500m gets a bigger celebration
+      if (lastMilestone % 500 === 0) {
+        playMilestoneFanfare();
+        if (typeof spawnConfetti === 'function') spawnConfetti();
+        cameraShake = 0.35;
       }
       // Firework burst
       for (var p = 0; p < 24; p++) {
@@ -1346,7 +1531,7 @@ function main() {
                 d = new Date();
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
                   Die();
-                  if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
+                  if (typeof uiGameOver === 'function') { uiGameOver(score, coins_collected, runDistance); return; }
                 }
                 else {
                   cameraShake = 0.3; safeVibrate(30);
@@ -1376,7 +1561,7 @@ function main() {
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
                   score = -player.pos[2] + coins_collected;
                   Die();
-                  if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
+                  if (typeof uiGameOver === 'function') { uiGameOver(score, coins_collected, runDistance); return; }
                 }
                 else {
                   cameraShake = 0.3; safeVibrate(30);
@@ -1405,7 +1590,7 @@ function main() {
               if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
                 score = -player.pos[2] + coins_collected;
                 Die();
-                if (typeof uiGameOver === 'function') { uiGameOver(false, score, coins_collected); return; }
+                if (typeof uiGameOver === 'function') { uiGameOver(score, coins_collected, runDistance); return; }
               }
               else {
                 cameraShake = 0.3; safeVibrate(30);
@@ -1534,7 +1719,9 @@ function main() {
                   else if (xc == 6)
                     xc = -6;
                 }
-                coins.push(new Coin(gl, [xc, yc, zi]))
+                var flyCoin = new Coin(gl, [xc, yc, zi]);
+                flyCoin.temp = true; // pruned by streamWorld once passed
+                coins.push(flyCoin);
                 zi -= 2;
                 c += 1;
               }
@@ -1573,23 +1760,6 @@ function main() {
           }
         }
       }
-    }
-
-    if (player.pos[2] <= -800 && !dying) {
-      score = -player.pos[2] + coins_collected;
-      // Victory celebration
-      playVictorySound();
-      if (typeof flashScreen === 'function') flashScreen('#ffd700', 0.5);
-      if (typeof spawnConfetti === 'function') spawnConfetti();
-      for (var p = 0; p < 40; p++) {
-        var angle = Math.random() * Math.PI * 2;
-        var speed = 3.0 + Math.random() * 5.0;
-        particles.push(new Particle(gl,
-          [player.pos[0], player.pos[1] + 2, player.pos[2]],
-          [Math.cos(angle)*speed, Math.random()*6.0 + 2.0, Math.sin(angle)*speed],
-          1.0 + Math.random()*0.5, glow_gold_texture));
-      }
-      if (typeof uiGameOver === 'function') { uiGameOver(true, score, coins_collected); return; }
     }
 
     // Decay score multiplier if no coin collected recently
@@ -1811,6 +1981,7 @@ function drawScene(gl, programInfo, deltaTime) {
   gl.uniform1f(programInfo.uniformLocations.uFogFar, 90.0);
   gl.uniform1f(programInfo.uniformLocations.uGlow, theme == 2 ? 0.35 : 0.0);
   gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
+  gl.uniform1f(programInfo.uniformLocations.uCamZ, cam_z);
 
   // Distance-based culling bounds
   var cullNear = cam_z + 8;
@@ -1821,30 +1992,25 @@ function drawScene(gl, programInfo, deltaTime) {
   var num_boxes = boxes.length;
   var num_manholes = manholes.length;
 
-  // Compute visible track range (tracks at z = -i * 5)
-  var iStart = Math.max(0, Math.floor(-(cullNear + 5) / 5));
-  var iEnd = Math.min(1000, Math.ceil(-(cullFar - 5) / 5));
-  for (var i = iStart; i < iEnd; i += 1) {
-    track1[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
-    track2[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
-    track3[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+  // Ground and backdrop are recycled pools, so cull by position rather than
+  // by index — their Z no longer maps to their slot.
+  for (var i = 0; i < TRACK_POOL; i += 1) {
+    if (track1[i].pos[2] < cullNear && track1[i].pos[2] > cullFar) {
+      track1[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+      track2[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+      track3[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+    }
   }
 
-  // Background parallax: city/wall move slower than foreground
-  var parallaxOffset = cam_z * 0.06;
-  var bgStart = Math.max(0, Math.floor(-(cullNear + 5 + parallaxOffset) / 10));
-  var bgEnd = Math.min(1000, Math.ceil(-(cullFar - 5 + parallaxOffset) / 10));
-  for (var i = bgStart; i < bgEnd; i += 1) {
-    if (theme == 1) {
-      var origZ = city[i].pos[2];
-      city[i].pos[2] = origZ - parallaxOffset;
-      city[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
-      city[i].pos[2] = origZ;
-    } else if (theme == 2) {
-      var origZ = wall[i].pos[2];
-      wall[i].pos[2] = origZ - parallaxOffset;
-      wall[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
-      wall[i].pos[2] = origZ;
+  if (theme == 1) {
+    for (var i = 0; i < CITY_POOL; i += 1) {
+      if (city[i].pos[2] < cullNear && city[i].pos[2] > cullFar)
+        city[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+    }
+  } else if (theme == 2) {
+    for (var i = 0; i < WALL_POOL; i += 1) {
+      if (wall[i].pos[2] < cullNear && wall[i].pos[2] > cullFar)
+        wall[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
     }
   }
 

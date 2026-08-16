@@ -223,12 +223,12 @@ window.ssGameStarted = false;
     { id: 'score_1000',   icon: '💎', name: 'Legend',           desc: 'Score 1000+ points',             check: function (s) { return s.best >= 1000; } },
     { id: 'coins_50',     icon: '🪙', name: 'Coin Collector',   desc: 'Collect 50+ coins in one game',  check: function (s) { return s.maxCoins >= 50; } },
     { id: 'coins_100',    icon: '🏆', name: 'Coin Master',      desc: 'Collect 100+ coins in one game', check: function (s) { return s.maxCoins >= 100; } },
-    { id: 'win_1',        icon: '🏁', name: 'Survivor',         desc: 'Win a game',                     check: function (s) { return s.wins >= 1; } },
-    { id: 'win_5',        icon: '👑', name: 'Champion',         desc: 'Win 5 games',                    check: function (s) { return s.wins >= 5; } },
+    { id: 'dist_1000',    icon: '🏁', name: 'Marathoner',       desc: 'Run 1000m in one game',          check: function (s) { return s.bestDistance >= 1000; } },
+    { id: 'dist_3000',    icon: '👑', name: 'Unstoppable',      desc: 'Run 3000m in one game',          check: function (s) { return s.bestDistance >= 3000; } },
   ];
 
   function getStats() {
-    var def = { games: 0, wins: 0, totalCoins: 0, best: 0, maxCoins: 0 };
+    var def = { games: 0, bestDistance: 0, totalCoins: 0, best: 0, maxCoins: 0 };
     var raw = localStorage.getItem('ss_stats');
     if (!raw) return def;
     try {
@@ -258,13 +258,13 @@ window.ssGameStarted = false;
     }
     return false;
   }
-  function updateStats(won, finalScore, finalCoins) {
+  function updateStats(finalScore, finalCoins, finalDistance) {
     var s = getStats();
     s.games += 1;
-    if (won) s.wins += 1;
     s.totalCoins += finalCoins;
     if (finalScore > s.best) s.best = Math.floor(finalScore);
     if (finalCoins > s.maxCoins) s.maxCoins = finalCoins;
+    if (finalDistance > s.bestDistance) s.bestDistance = Math.floor(finalDistance);
     saveStats(s);
     // Check achievements
     var newlyUnlocked = [];
@@ -297,11 +297,11 @@ window.ssGameStarted = false;
   function renderStats() {
     var s = getStats();
     var elGames = $('#stat-games');
-    var elWins = $('#stat-wins');
+    var elDist = $('#stat-best-distance');
     var elCoins = $('#stat-total-coins');
     var elBest = $('#stat-best');
     if (elGames) elGames.textContent = s.games;
-    if (elWins) elWins.textContent = s.wins;
+    if (elDist) elDist.textContent = formatNum(s.bestDistance) + 'm';
     if (elCoins) elCoins.textContent = formatNum(s.totalCoins);
     if (elBest) elBest.textContent = formatNum(s.best);
     renderAchievements();
@@ -660,7 +660,7 @@ window.ssGameStarted = false;
   };
 
   // ===== Public: Game Over =====
-  window.uiGameOver = function (won, finalScore, finalCoins) {
+  window.uiGameOver = function (finalScore, finalCoins, finalDistance) {
     if (currentScreen === 'gameover') return; // guard against double-fire (stats would double-count)
     setPaused(true);
     gameLaunching = false;
@@ -688,27 +688,28 @@ window.ssGameStarted = false;
     var streakV = $('#result-streak');
     var powersV = $('#result-powers');
 
+    var dist = Math.floor(finalDistance || 0);
     if (title) {
-      title.textContent = won ? 'YOU WON!' : 'GAME OVER';
-      title.className = 'result-title ' + (won ? 'win' : 'lose');
+      title.textContent = 'GAME OVER';
+      title.className = 'result-title lose';
+      title.style.color = '';
+      title.style.textShadow = '';
     }
     if (scoreV) scoreV.textContent = formatNum(Math.floor(finalScore));
     if (coinV) coinV.textContent = finalCoins;
-    if (distV) distV.textContent = (typeof player !== 'undefined' && player ? Math.floor(-player.pos[2]) : 0) + 'm';
+    if (distV) distV.textContent = formatNum(dist) + 'm';
     if (streakV) streakV.textContent = typeof bestStreak !== 'undefined' ? bestStreak : 0;
     if (powersV) powersV.textContent = typeof powersCollected !== 'undefined' ? powersCollected : 0;
 
     var isNewBest = setHighScore(finalScore);
-    var newAchievements = updateStats(won, finalScore, finalCoins);
+    var newAchievements = updateStats(finalScore, finalCoins, dist);
     if (bestWrap) bestWrap.style.display = '';
     if (bestV) {
       bestV.textContent = formatNum(getHighScore()) + (isNewBest ? ' ★' : '');
     }
     if (isNewBest) {
-      // The title announces the record (kept as YOU WON! on a win — the
-      // gold Best value with ★, confetti and burst already celebrate it);
-      // flash + confetti + burst carry the rest so text isn't repeated
-      if (title && !won) {
+      // Title carries the record; flash + confetti + burst do the rest
+      if (title) {
         title.textContent = 'NEW RECORD!';
         title.style.color = 'var(--neon-gold)';
         title.style.textShadow = '0 0 30px rgba(255,215,0,0.5)';
