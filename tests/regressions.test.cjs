@@ -215,6 +215,25 @@ test('impact freeze lasts fifty milliseconds within one frame at every refresh r
   }
 });
 
+test('impact freeze preserves the rendered character poses', async () => {
+  const g = await game(); g.clearCourse();
+  g.state.manholes[0].pos = g.state.player.pos.slice();
+  g.step(1 / 144);
+  assert.ok(g.state.dying && g.state.freezeTime > 0);
+  const poses = () => ['player', 'police', 'dog'].map(name =>
+    g.draws.find(draw => draw.buffer === g.state[name].buffer.normal).matrix);
+  const impact = poses();
+  let displayed = impact;
+  for (let i = 0; i < 16 && g.state.freezeTime > 0; i++) {
+    g.step(1 / 144);
+    if (g.draws.length) displayed = poses();
+    assert.deepEqual(displayed, impact, 'the frozen scene changed character poses');
+  }
+  assert.equal(g.state.freezeTime, 0);
+  g.step(1 / 144);
+  assert.ok(g.draws.length > 0 && g.state.deathTimer > 0, 'death animation did not resume after the freeze');
+});
+
 test('police stay behind the runner through a stumble and recovery', async () => {
   const g = await game(); g.clearCourse();
   for (let i = 0; i < 1200; i++) g.step();

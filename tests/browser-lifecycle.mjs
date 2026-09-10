@@ -91,6 +91,43 @@ try {
     if (artifacts) await page.screenshot({path: join(artifacts, 'settings-without-fullscreen.png'), animations: 'disabled'});
   });
 
+  await test('fullscreen-disabled-frame', async page => {
+    await page.goto(url);
+    await page.setContent('<iframe title="Game" allow="fullscreen \'none\'" style="width:100%;height:900px"></iframe>');
+    await page.locator('iframe').evaluate((el, url) => { el.src = url; }, url);
+    const frame = page.frameLocator('iframe');
+    await frame.locator('#btn-settings').click();
+    assert.equal(await frame.locator('html').evaluate(() => document.fullscreenEnabled), false);
+    assert.equal(await frame.locator('#btn-fullscreen').isVisible(), false, 'a forbidden fullscreen action is visible');
+    assert.equal(await frame.getByRole('button', {name: 'Fullscreen'}).count(), 0);
+  });
+
+  await test('browser-touch-swipes', async page => {
+    await page.setViewportSize({width: 390, height: 844});
+    await start(page);
+    const cdp = await page.context().newCDPSession(page);
+    try {
+      await cdp.send('Emulation.setTouchEmulationEnabled', {enabled: true, maxTouchPoints: 5});
+      const ys = await page.locator('#glcanvas').evaluate(el => {
+        const rect = el.getBoundingClientRect();
+        return [rect.top + rect.height / 2, rect.top - 40];
+      });
+      for (const y of ys) {
+        await page.evaluate(() => { player.pos[0] = -6; });
+        await cdp.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x: 120, y}]});
+        for (const x of [140, 180, 220]) {
+          await cdp.send('Input.dispatchTouchEvent', {type: 'touchMove', touchPoints: [{x, y}]});
+          await page.waitForTimeout(25);
+        }
+        await cdp.send('Input.dispatchTouchEvent', {type: 'touchEnd', touchPoints: []});
+        assert.equal(await page.evaluate(() => player.pos[0]), 0, `browser swipe at y=${y} did not move exactly once`);
+      }
+      await cdp.send('Input.dispatchTouchEvent', {type: 'touchStart', touchPoints: [{x: 120, y: ys[0]}]});
+      await cdp.send('Input.dispatchTouchEvent', {type: 'touchCancel', touchPoints: []});
+      assert.equal(await page.evaluate(() => player.pos[0]), 0, 'cancelled touch moved the player');
+    } finally { await cdp.detach(); }
+  });
+
   await test('accessible-direction-buttons', async page => {
     await page.setViewportSize({width: 390, height: 844});
     await start(page);
@@ -203,6 +240,23 @@ try {
     assert.ok(await page.evaluate(() => Boolean(document.activeElement.closest('#settings-screen'))), 'focus stayed on the hidden menu');
     assert.equal(await page.getByRole('slider', {name: 'Music volume', exact: true}).count(), 1);
     assert.equal(await page.getByRole('slider', {name: 'Sound effects volume', exact: true}).count(), 1);
+  });
+
+  await test('record-score-ties', async page => {
+    await start(page);
+    const cases = [[0.5, false, 0], [100.2, true, 100], [100.9, false, 100], [101.1, true, 101]];
+    for (let i = 0; i < cases.length; i++) {
+      const [score, record, best] = cases[i];
+      await page.evaluate(score => uiGameOver(score, 0, score), score);
+      assert.equal(await page.locator('#result-title').textContent(), record ? 'NEW RECORD!' : 'GAME OVER', `score ${score}`);
+      assert.equal(await page.locator('#result-best').textContent(), String(best) + (record ? ' ★' : ''));
+      assert.equal(await page.evaluate(() => Number(localStorage.getItem('ss_highscore'))), best);
+      if (artifacts) await page.screenshot({path: join(artifacts, `record-${Math.floor(score)}-${record}.png`), animations: 'disabled'});
+      if (i + 1 < cases.length) {
+        await page.locator('#btn-restart-over').click();
+        await page.waitForFunction(() => gameReady && !gamePaused);
+      }
+    }
   });
 
   await test('restart-hud', async page => {

@@ -353,9 +353,10 @@ window.ssGameStarted = false;
     return isFinite(n) && n >= 0 ? n : 0;
   }
   function setHighScore(val) {
+    val = Math.floor(val);
     var cur = getHighScore();
     if (val > cur) {
-      ssStorage.set('ss_highscore', String(Math.floor(val)));
+      ssStorage.set('ss_highscore', String(val));
       return true;
     }
     return false;
@@ -895,7 +896,7 @@ window.ssGameStarted = false;
     if (btnSettingsBack) btnSettingsBack.onclick = function () { playClick(); showScreen('start'); };
     if (btnFullscreen) btnFullscreen.onclick = function () { playClick(); uiToggleFullscreen(); };
     if (btnWebglBack) btnWebglBack.onclick = function () { location.reload(); };
-    if (btnFullscreen) btnFullscreen.hidden = !document.documentElement.requestFullscreen;
+    if (btnFullscreen) btnFullscreen.hidden = !document.documentElement.requestFullscreen || !document.fullscreenEnabled;
     if (btnShare) {
       // Captured once: re-reading textContent on click would latch the
       // "Shared!" label permanently if the button is clicked twice in a row.

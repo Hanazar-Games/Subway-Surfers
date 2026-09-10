@@ -1113,10 +1113,9 @@ async function main() {
       if (Math.floor(d.getTime() * 0.001 - flash_start_time) % 2 != 0) activeProgram = programInfohigh;
     }
 
-    // Freeze frame on death impact (render but don't update)
+    // Keep the impact frame visible until the hit-stop ends.
     if (freezeTime > 0) {
       freezeTime = Math.max(0, freezeTime - deltaTime);
-      drawScene(gl, activeProgram, 0);
       return;
     }
 
