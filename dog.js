@@ -85,10 +85,10 @@ let Dog = class {
             0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0,
             // Bottom
             0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0,
-            // Right
-            1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
             // Left
             -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0, -1.0, 0.0, 0.0,
+            // Right
+            1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0, 1.0, 0.0, 0.0,
         ];
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals), gl.STATIC_DRAW);
 
@@ -314,6 +314,8 @@ let Dog = class {
         this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0, 0.16, -0.46], [0.07, 0.07, 0.3], 0.5 + gait * 0.4, [1, 0, 0]);
 
         // ========== DRAW HEAD ==========
+        gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.normalMatrix, false, normalMatrix);
         {
             gl.bindBuffer(gl.ARRAY_BUFFER, this.headBuffer.position);
             gl.vertexAttribPointer(
@@ -362,6 +364,5 @@ let Dog = class {
             gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
         }
 
-        cubeRotation += deltaTime;
     }
 };

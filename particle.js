@@ -50,10 +50,15 @@ let Particle = class {
         this.pos[2] += this.velocity[2] * deltaTime;
         this.velocity[1] -= 2.0 * deltaTime; // gravity
         // air resistance / drag
-        this.velocity[0] *= 0.98;
-        this.velocity[1] *= 0.98;
-        this.velocity[2] *= 0.98;
+        var drag = Math.pow(0.98, deltaTime * 60);
+        this.velocity[0] *= drag;
+        this.velocity[1] *= drag;
+        this.velocity[2] *= drag;
         this.life -= deltaTime;
+    }
+
+    dispose(gl) {
+        Object.values(this.buffer).forEach(buffer => gl.deleteBuffer(buffer));
     }
 
     drawCube(gl, projectionMatrix, programInfo, deltaTime) {
@@ -93,9 +98,13 @@ let Particle = class {
 
         gl.enable(gl.BLEND);
         gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+        gl.depthMask(false);
+        gl.uniform1f(programInfo.uniformLocations.uAlpha, this.life / this.maxLife);
 
         gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
+        gl.uniform1f(programInfo.uniformLocations.uAlpha, 1);
+        gl.depthMask(true);
         gl.disable(gl.BLEND);
     }
 };

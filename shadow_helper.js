@@ -88,11 +88,13 @@ function drawShadow(gl, projectionMatrix, programInfo, x, y, z, sx, sz) {
     // Enable blending for transparency
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+    gl.depthMask(false);
     // Depth test should be controlled by caller (often disabled so shadow
     // overlays the ground plane, then re-enabled before drawing the object)
 
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
+    gl.depthMask(true);
     gl.disable(gl.BLEND);
 }
 
@@ -135,8 +137,10 @@ function drawGlow(gl, projectionMatrix, programInfo, texture, x, y, z, sx, sy) {
 
     gl.enable(gl.BLEND);
     gl.blendFunc(gl.SRC_ALPHA, gl.ONE); // additive blending for glow
+    gl.depthMask(false);
 
     gl.drawElements(gl.TRIANGLES, 6, gl.UNSIGNED_SHORT, 0);
 
+    gl.depthMask(true);
     gl.disable(gl.BLEND);
 }

@@ -30,14 +30,7 @@ let Coin = class {
         const normalBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
         const vertexNormals = new Array();
-        for (var i = 0; i < this.n; i++) {
-            vertexNormals.push(0);
-            vertexNormals.push(0);
-            vertexNormals.push(1);
-            vertexNormals.push(0);
-            vertexNormals.push(0);
-            vertexNormals.push(1);
-        }
+        for (var i = 0; i <= this.n; i++) vertexNormals.push(0, 0, 1);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals), gl.STATIC_DRAW);
 
         const indexBuffer = gl.createBuffer();
@@ -56,18 +49,9 @@ let Coin = class {
 
         const textureCoordBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, textureCoordBuffer);
-        var textureCoordinates = new Array();
-        for (var i = 0; i < this.n; i++) {
-            textureCoordinates.push(0);
-            textureCoordinates.push(0);
-            textureCoordinates.push(1);
-            textureCoordinates.push(0);
-            textureCoordinates.push(0);
-            textureCoordinates.push(1);
-            textureCoordinates.push(0);
-            textureCoordinates.push(0);
-            textureCoordinates.push(1);
-        }
+        var textureCoordinates = [0.5, 0.5];
+        for (var i = 0; i < this.n; i++)
+            textureCoordinates.push(0.5 + Math.cos(i * inc) * 0.5, 0.5 + Math.sin(i * inc) * 0.5);
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(textureCoordinates), gl.STATIC_DRAW);
 
         this.buffer = {
@@ -76,6 +60,10 @@ let Coin = class {
             textureCoord: textureCoordBuffer,
             indices: indexBuffer,
         }
+    }
+
+    dispose(gl) {
+        Object.values(this.buffer).forEach(buffer => gl.deleteBuffer(buffer));
     }
 
     drawCube(gl, projectionMatrix, programInfo, deltaTime) {
@@ -92,7 +80,7 @@ let Coin = class {
         mat4.translate(modelViewMatrix, modelViewMatrix, [0, floatY, 0]);
 
         // Spin animation
-        this.rotation += this.speed;
+        this.rotation += this.speed * deltaTime * 60;
 
         mat4.rotate(modelViewMatrix,
             modelViewMatrix,

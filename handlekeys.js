@@ -13,9 +13,10 @@ document.addEventListener(
         if (!gameReady) {
             return;
         }
-        if (window.gamePaused) {
+        if (window.gamePaused || dying) {
             return;
         }
+        if (event.target && event.target.closest && event.target.closest('button, input, select, textarea')) return;
         key = event.keyCode;
         // 阻止方向键和空格滚动页面
         if ([32, 37, 38, 39, 40].indexOf(key) !== -1) {
@@ -36,23 +37,25 @@ document.addEventListener(
         }
         // Ignore jump while already rising or while flying (prevents mid-air
         // jump refresh / sound spam and stale jump state after fly boost)
-        if (key == 38 && !jumping && !player.fly_boost) {
-            if (player.pos[1] < -4) {
-                player.pos[1] = -4;
-            }
+        if (key == 38 && player.grounded && !player.fly_boost) {
+            if (ducking) player.pos[1] += 1;
             jumping = true;
             ducking = false;
-            player.speedy = 0.3;
+            player.grounded = false;
+            wasInAir = true;
+            player.speedy = Math.sqrt(0.02 * (player.jumping_boots ? 7 : 4));
             if (typeof playJumpSound === 'function') playJumpSound();
         }
         if (key == 40) {
             if (player.fly_boost == false) {
-                if (player.pos[1] != -4) {
-                    player.pos[1] = -4;
+                if (player.grounded) {
+                    if (!ducking) player.pos[1] -= 1;
+                    ducking = true;
+                    duckTime = 0.45;
+                } else {
+                    player.speedy = -0.5;
                 }
-                ducking = true;
                 jumping = false;
-                player.speedy = 0.2;
                 if (typeof playBumpSound === 'function') playBumpSound();
             }
         }

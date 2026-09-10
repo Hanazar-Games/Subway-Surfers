@@ -3,11 +3,12 @@
 
 <head>
   <meta charset="utf-8">
+  <meta name="application-version" content="1.1.10">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Subway Surfers</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./webgl.css" type="text/css">
-  <link rel="stylesheet" href="./ui.css" type="text/css">
+  <link rel="stylesheet" href="./webgl.css?v=1.1.10" type="text/css">
+  <link rel="stylesheet" href="./ui.css?v=1.1.10" type="text/css">
 </head>
 
 <body>
@@ -118,7 +119,7 @@
         <span class="key-badge">1</span><span class="control-desc">City Theme</span>
         <span class="key-badge">2</span><span class="control-desc">Neon Theme</span>
         <span class="key-badge">G</span><span class="control-desc">Greyscale Mode</span>
-        <span class="key-badge">F</span><span class="control-desc">Flashing Walls</span>
+        <span class="key-badge">F</span><span class="control-desc">Flashing Effect</span>
         <span class="key-badge">Esc</span><span class="control-desc">Pause Game</span>
       </div>
       <p style="font-size:13px;color:var(--text-secondary);margin-bottom:24px;line-height:1.6;">
@@ -227,7 +228,7 @@
         </div>
       </div>
       <div class="hud-right">
-        <button id="hud-pause" class="hud-pause-btn">⏸</button>
+        <button id="hud-pause" class="hud-pause-btn" aria-label="Pause">⏸</button>
         <div class="hud-powers">
           <div class="power-wrap" id="wrap-boots">
             <div class="power-icon" id="power-boots" data-type="boots" title="Jumping Boots">🥾</div>
@@ -341,12 +342,12 @@
   <div id="webgl-error" class="ui-screen hidden">
     <div class="glass-card" style="max-width: 480px;">
       <div style="font-size: 48px; margin-bottom: 12px;">⚠️</div>
-      <div class="game-logo-small" style="font-size: 24px; margin-bottom: 8px;">WebGL Not Supported</div>
-      <p style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px;">
+      <div class="game-logo-small" style="font-size: 24px; margin-bottom: 8px;">Unable to Start</div>
+      <p id="webgl-error-message" style="font-size: 14px; color: var(--text-secondary); line-height: 1.6; margin-bottom: 24px;">
         Your browser or device does not support WebGL, which is required to run this game.<br><br>
         Please try using a modern browser like Chrome, Firefox, or Edge.
       </p>
-      <button id="btn-webgl-back" class="btn btn-outline btn-sm">← Back to Menu</button>
+      <button id="btn-webgl-back" class="btn btn-outline btn-sm">Reload Game</button>
     </div>
   </div>
 
@@ -378,6 +379,8 @@
   <!-- ===== Audio ===== -->
   <audio src='./assets/Theme.mp3' id="music" loop></audio>
   <audio src='./assets/Crash.mp3' id="crash"></audio>
+
+  <script src="./ui.js?v=1.1.10"></script>
 
   <!-- ===== Splash Screen JS ===== -->
   <script>
@@ -416,11 +419,7 @@
     })();
 
     // Splash fadeout + reveal start menu
-    // Skip splash on restart/menu reloads (one-shot session flag) or when
-    // the user disabled the intro animation in settings (persistent).
-    var skipSplash = sessionStorage.getItem('ss_skipSplash') === 'true'
-      || localStorage.getItem('ss_showIntro') === 'false';
-    sessionStorage.removeItem('ss_skipSplash');
+    var skipSplash = ssStorage.get('ss_showIntro') === 'false';
     var splashDone = false;
     // `immediate` is only true when called directly; as an event listener the
     // first argument is an Event, so skipped-intro reloads stay instant while
@@ -452,31 +451,28 @@
     }
   </script>
 
-  <!-- ===== UI Controller ===== -->
-  <script src="./ui.js"></script>
-
   <!-- ===== Game Engine Scripts (main.js prefetched for instant start) ===== -->
-  <link rel="prefetch" as="script" href="./main.js">
-  <script src="./gl-matrix.js"></script>
-  <script src="./shadow_helper.js"></script>
-  <script src="./cube.js"></script>
-  <script src="./track.js"></script>
-  <script src="./wall.js"></script>
-  <script src="./city.js"></script>
-  <script src="./handlekeys.js"></script>
-  <script src="./player.js"></script>
-  <script src="./police.js"></script>
-  <script src="./dog.js"></script>
-  <script src="./coin.js"></script>
-  <script src="./particle.js"></script>
-  <script src="./train.js"></script>
-  <script src="./box.js"></script>
-  <script src="./manhole.js"></script>
-  <script src="./stop.js"></script>
-  <script src="./stand.js"></script>
-  <script src="./boots.js"></script>
-  <script src="./flying_boost.js"></script>
-  <script src="./hoverboard.js"></script>
+  <link rel="prefetch" as="script" href="./main.js?v=1.1.10">
+  <script src="./gl-matrix.js?v=1.1.10"></script>
+  <script src="./shadow_helper.js?v=1.1.10"></script>
+  <script src="./cube.js?v=1.1.10"></script>
+  <script src="./track.js?v=1.1.10"></script>
+  <script src="./wall.js?v=1.1.10"></script>
+  <script src="./city.js?v=1.1.10"></script>
+  <script src="./handlekeys.js?v=1.1.10"></script>
+  <script src="./player.js?v=1.1.10"></script>
+  <script src="./police.js?v=1.1.10"></script>
+  <script src="./dog.js?v=1.1.10"></script>
+  <script src="./coin.js?v=1.1.10"></script>
+  <script src="./particle.js?v=1.1.10"></script>
+  <script src="./train.js?v=1.1.10"></script>
+  <script src="./box.js?v=1.1.10"></script>
+  <script src="./manhole.js?v=1.1.10"></script>
+  <script src="./stop.js?v=1.1.10"></script>
+  <script src="./stand.js?v=1.1.10"></script>
+  <script src="./boots.js?v=1.1.10"></script>
+  <script src="./flying_boost.js?v=1.1.10"></script>
+  <script src="./hoverboard.js?v=1.1.10"></script>
 </body>
 
 </html>

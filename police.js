@@ -120,12 +120,12 @@ let Police = class {
             0.0, -1.0, 0.0,
             0.0, -1.0, 0.0,
             0.0, -1.0, 0.0,
-            // Right
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
             // Left
+            -1.0, 0.0, 0.0,
+            -1.0, 0.0, 0.0,
+            -1.0, 0.0, 0.0,
+            -1.0, 0.0, 0.0,
+            // Right
             1.0, 0.0, 0.0,
             1.0, 0.0, 0.0,
             1.0, 0.0, 0.0,
@@ -354,6 +354,8 @@ let Police = class {
         this.drawBodyPart(gl, projectionMatrix, programInfo, modelViewMatrix, [0, 1.72, 0.2], [0.6, 0.09, 0.5], 0, [1, 0, 0]);
 
         // ========== DRAW HEAD ==========
+        gl.uniformMatrix4fv(programInfo.uniformLocations.modelViewMatrix, false, modelViewMatrix);
+        gl.uniformMatrix4fv(programInfo.uniformLocations.normalMatrix, false, normalMatrix);
         {
             gl.bindBuffer(gl.ARRAY_BUFFER, this.headBuffer.position);
             gl.vertexAttribPointer(

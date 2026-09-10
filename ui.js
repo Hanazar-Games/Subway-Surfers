@@ -4,6 +4,18 @@
  * Minimal intrusion into game core (main.js)
  */
 
+var ssStorage = {
+  values: Object.create(null),
+  get: function (key) {
+    if (key in this.values) return this.values[key];
+    try { return localStorage.getItem(key); } catch (e) { return this.values[key] || null; }
+  },
+  set: function (key, value) {
+    try { localStorage.setItem(key, String(value)); delete this.values[key]; }
+    catch (e) { this.values[key] = String(value); }
+  }
+};
+
 // Global pause flag - used by main.js render loop
 var gamePaused = true;
 window.gamePaused = true;
@@ -13,7 +25,7 @@ window.ssGameStarted = false;
   'use strict';
 
   // ===== State =====
-  var currentScreen = 'start';   // 'start' | 'playing' | 'paused' | 'gameover' | 'howto' | 'stats' | 'settings'
+  var currentScreen = 'start';   // 'start' | 'playing' | 'pause' | 'gameover' | 'howto' | 'stats' | 'settings'
   var gameAudio = null;
   var crashAudio = null;
   var hudInterval = null;
@@ -21,10 +33,11 @@ window.ssGameStarted = false;
   var countdownFallbackTimer = null;
   var countdownActive = false;
   var gameLaunching = false;
-  var resumePending = false;
+  var runGeneration = 0;
+  var hasRun = false;
   var pauseStartedAt = 0;
   var themeFlashTimer = null;
-  var scorePopTimer = null;
+  var scorePopTimers = new WeakMap();
   var keyHintTimer = null;
   window.uiCurrentScreen = currentScreen;
 
@@ -51,19 +64,27 @@ window.ssGameStarted = false;
     window.uiCurrentScreen = name;
     Object.keys(screens).forEach(function (k) {
       if (screens[k]) {
-        if (k === name) screens[k].classList.remove('hidden');
-        else screens[k].classList.add('hidden');
+        screens[k].classList.toggle('hidden', k !== name);
+        screens[k].inert = k !== name;
       }
     });
+    var target = screens[name];
+    if (target) {
+      target.scrollTop = 0;
+      var button = target.querySelector('button');
+      if (button) button.focus({ preventScroll: true });
+    } else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   }
 
   function showHUD() {
+    screens.hud.inert = false;
     screens.hud.classList.remove('hidden');
     screens.hud.classList.add('visible');
     var hs = $('#hud-highscore');
     if (hs) hs.classList.add('visible');
     var tc = $('#touch-controls');
     if (tc) {
+      tc.inert = false;
       tc.classList.remove('hidden');
       tc.classList.add('visible');
     }
@@ -71,18 +92,23 @@ window.ssGameStarted = false;
     if (db) db.classList.add('visible');
   }
   function hideHUD() {
+    screens.hud.inert = true;
     screens.hud.classList.remove('visible');
     screens.hud.classList.add('hidden');
     var hs = $('#hud-highscore');
     if (hs) hs.classList.remove('visible');
     var tc = $('#touch-controls');
     if (tc) {
+      tc.inert = true;
       tc.classList.remove('visible');
       tc.classList.add('hidden');
     }
     var db = $('#distance-bar');
     if (db) db.classList.remove('visible');
     hideKeyHint();
+    var themeBadge = $('#hud-theme');
+    if (themeBadge) themeBadge.classList.remove('visible');
+    document.querySelectorAll('.score-popup, .combo-text').forEach(function (el) { el.remove(); });
   }
 
   // ===== Countdown =====
@@ -148,7 +174,7 @@ window.ssGameStarted = false;
     return Math.max(0, Math.min(1, n));
   }
   function getAudioSettings() {
-    var raw = localStorage.getItem('ss_audio');
+    var raw = ssStorage.get('ss_audio');
     if (!raw) return { music: 0.5, sfx: 0.5 };
     try {
       var parsed = JSON.parse(raw);
@@ -163,7 +189,7 @@ window.ssGameStarted = false;
       music: clamp01(obj.music, 0.5),
       sfx: clamp01(obj.sfx, 0.5)
     };
-    localStorage.setItem('ss_audio', JSON.stringify(safe));
+    ssStorage.set('ss_audio', JSON.stringify(safe));
   }
   function setSliderValue(slider, label, value) {
     if (slider) slider.value = Math.round(value * 100);
@@ -177,11 +203,12 @@ window.ssGameStarted = false;
   }
   function applyAudio() {
     var s = getAudioSettings();
+    if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
     gameAudio = document.getElementById('music');
     crashAudio = document.getElementById('crash');
-    if (gameAudio) gameAudio.volume = s.music;
+    if (gameAudio) gameAudio.volume = currentScreen === 'pause' ? Math.min(0.1, s.music) : s.music;
     if (crashAudio) crashAudio.volume = s.sfx;
-    if (typeof setSfxVolume === 'function') setSfxVolume(s.sfx);
+    if (typeof setSfxVolume === 'function') setSfxVolume(gamePaused ? 0 : s.sfx);
     syncAudioControls();
   }
   var fadeInterval = null;
@@ -197,6 +224,7 @@ window.ssGameStarted = false;
       gameAudio.volume = Math.max(0, Math.min(1, vol));
       if (t >= 1) {
         clearInterval(fadeInterval);
+        fadeInterval = null;
         if (onDone) onDone();
       }
     }, 50);
@@ -209,9 +237,9 @@ window.ssGameStarted = false;
 
   // ===== Fullscreen =====
   window.uiToggleFullscreen = function () {
-    if (!document.fullscreenElement) {
+    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
       document.documentElement.requestFullscreen().catch(function () {});
-    } else {
+    } else if (document.exitFullscreen) {
       document.exitFullscreen().catch(function () {});
     }
   };
@@ -229,31 +257,32 @@ window.ssGameStarted = false;
 
   function getStats() {
     var def = { games: 0, bestDistance: 0, totalCoins: 0, best: 0, maxCoins: 0 };
-    var raw = localStorage.getItem('ss_stats');
+    var raw = ssStorage.get('ss_stats');
     if (!raw) return def;
     try {
       var parsed = JSON.parse(raw);
-      // Older saves may miss keys (or hold garbage); backfill so
-      // comparisons like `finalCoins > s.maxCoins` never silently fail
-      Object.keys(def).forEach(function (k) {
-        if (typeof parsed[k] !== 'number' || !isFinite(parsed[k])) parsed[k] = def[k];
+      Object.keys(def).forEach(function (key) {
+        if (parsed && typeof parsed[key] === 'number' && isFinite(parsed[key]) && parsed[key] >= 0) def[key] = Math.floor(parsed[key]);
       });
-      return parsed;
+      return def;
     } catch (e) { return def; }
   }
   function saveStats(obj) {
-    localStorage.setItem('ss_stats', JSON.stringify(obj));
+    ssStorage.set('ss_stats', JSON.stringify(obj));
   }
   function getUnlockedAchievements() {
-    var raw = localStorage.getItem('ss_achievements');
+    var raw = ssStorage.get('ss_achievements');
     if (!raw) return [];
-    try { return JSON.parse(raw); } catch (e) { return []; }
+    try {
+      var list = JSON.parse(raw);
+      return Array.isArray(list) ? list.filter(function (id) { return ACHIEVEMENTS.some(function (a) { return a.id === id; }); }) : [];
+    } catch (e) { return []; }
   }
   function unlockAchievement(id) {
     var list = getUnlockedAchievements();
     if (list.indexOf(id) === -1) {
       list.push(id);
-      localStorage.setItem('ss_achievements', JSON.stringify(list));
+      ssStorage.set('ss_achievements', JSON.stringify(list));
       return true;
     }
     return false;
@@ -309,14 +338,14 @@ window.ssGameStarted = false;
 
   // ===== High Score =====
   function getHighScore() {
-    var v = localStorage.getItem('ss_highscore');
+    var v = ssStorage.get('ss_highscore');
     var n = v === null ? 0 : parseInt(v, 10);
-    return isFinite(n) ? n : 0;
+    return isFinite(n) && n >= 0 ? n : 0;
   }
   function setHighScore(val) {
     var cur = getHighScore();
     if (val > cur) {
-      localStorage.setItem('ss_highscore', String(Math.floor(val)));
+      ssStorage.set('ss_highscore', String(Math.floor(val)));
       return true;
     }
     return false;
@@ -358,10 +387,10 @@ window.ssGameStarted = false;
     el.classList.remove('score-pop');
     void el.offsetWidth;
     el.classList.add('score-pop');
-    if (scorePopTimer) clearTimeout(scorePopTimer);
-    scorePopTimer = setTimeout(function () {
+    clearTimeout(scorePopTimers.get(el));
+    scorePopTimers.set(el, setTimeout(function () {
       el.classList.remove('score-pop');
-    }, 400);
+    }, 400));
   }
 
   // ===== HUD updater =====
@@ -402,10 +431,12 @@ window.ssGameStarted = false;
           if (best > 0 && cur > best) {
             scoreEl.style.color = 'var(--neon-gold)';
             scoreEl.style.textShadow = '0 0 15px rgba(255,215,0,0.5)';
+            scoreEl.classList.remove('near-record-pulse');
             scoreEl.classList.add('record-pulse');
           } else if (cur >= best - 50 && best > 0) {
             scoreEl.style.color = 'var(--neon-pink)';
             scoreEl.style.textShadow = '0 0 10px rgba(255,42,109,0.4)';
+            scoreEl.classList.remove('record-pulse');
             scoreEl.classList.add('near-record-pulse');
           } else {
             scoreEl.style.color = '';
@@ -516,7 +547,7 @@ window.ssGameStarted = false;
     if (settings.sfx <= 0) return;
     try {
       if (!clickCtx) clickCtx = new (window.AudioContext || window.webkitAudioContext)();
-      if (clickCtx.state === 'suspended') clickCtx.resume();
+      if (clickCtx.state === 'suspended') clickCtx.resume().catch(function () {});
       var osc = clickCtx.createOscillator();
       var gain = clickCtx.createGain();
       osc.connect(gain);
@@ -531,7 +562,17 @@ window.ssGameStarted = false;
 
   // ===== Public: Start Game =====
   window.uiStartGame = function () {
-    if (gameLaunching || currentScreen === 'playing') return;
+    if (gameLaunching || currentScreen !== 'start') return;
+    runGeneration++;
+    pauseStartedAt = 0;
+    $('#screen-flash').style.opacity = '0';
+    if (typeof endSplash === 'function') endSplash(true);
+    document.querySelectorAll('.confetti, .achievement-toast, .new-record-burst').forEach(function (el) { el.remove(); });
+    if (crashAudio) { crashAudio.pause(); crashAudio.currentTime = 0; }
+    if (gameAudio) {
+      gameAudio.currentTime = 0; gameAudio.volume = 0;
+      gameAudio.play().then(function () { if (gamePaused) gameAudio.pause(); }).catch(function () {});
+    }
     gameLaunching = true;
     window.ssGameStarted = true;
     // Check WebGL support before loading game
@@ -545,6 +586,7 @@ window.ssGameStarted = false;
 
     var loading = $('#loading-overlay');
     if (loading) loading.classList.remove('hidden');
+    screens.start.inert = true;
 
     function startPlay() {
       gameLaunching = false;
@@ -557,39 +599,59 @@ window.ssGameStarted = false;
         showKeyHint();
         if (typeof resetGameStartTiming === 'function') resetGameStartTiming();
         setPaused(false);
+        applyAudio();
+        if (typeof resumeSfx === 'function') resumeSfx();
         var s = getAudioSettings();
         if (gameAudio) { gameAudio.volume = 0; gameAudio.play().catch(function(){}); }
         fadeAudio(s.music, 1500);
         // Countdown may finish while the tab is hidden — don't let the
         // run start unattended
-        if (document.hidden) uiPauseGame();
+        if (document.hidden) { uiPauseGame(); uiStopRunAudio(); }
       });
     }
+    var scriptReady = Promise.resolve();
     if (typeof main !== 'function') {
-      var s = document.createElement('script');
-      s.src = './main.js';
-      s.onload = startPlay;
-      s.onerror = function () {
-        gameLaunching = false;
-        if (loading) loading.classList.add('hidden');
-        alert('Failed to load game. Please refresh and try again.');
-      };
-      document.body.appendChild(s);
-    } else {
-      startPlay();
+      scriptReady = new Promise(function (resolve, reject) {
+        var script = document.createElement('script');
+        script.src = document.querySelector('link[rel="prefetch"][as="script"]').href;
+        script.onload = resolve;
+        script.onerror = function () { script.remove(); reject(new Error('Unable to load game script')); };
+        document.body.appendChild(script);
+      });
     }
+    scriptReady.then(function () { return gameLoadPromise; }).then(function () {
+      if (!gameReady) throw new Error('Game initialization failed');
+      if (hasRun) resetGame();
+      hasRun = true;
+      startPlay();
+    }).catch(function (error) {
+      gameLaunching = false;
+      setPaused(true);
+      uiStopRunAudio();
+      if (loading) loading.classList.add('hidden');
+      var message = $('#webgl-error-message');
+      if (message) message.textContent = 'The game could not load. Check your connection and reload to try again.';
+      showScreen('webgl-error');
+      console.error(error);
+    });
+  };
+
+  window.uiStopRunAudio = function () {
+    if (fadeInterval) { clearInterval(fadeInterval); fadeInterval = null; }
+    if (gameAudio) gameAudio.pause();
+    if (typeof updateTrainRumble === 'function') updateTrainRumble(0);
+    if (typeof setSfxVolume === 'function') setSfxVolume(0);
   };
 
   // ===== Public: Pause =====
   window.uiPauseGame = function () {
     if (currentScreen !== 'playing') return;
-    if (countdownActive) return;
-    if (resumePending) return;
+    if (countdownActive || (typeof dying !== 'undefined' && dying)) return;
     setPaused(true);
-    resumePending = false;
+    if (typeof setSfxVolume === 'function') setSfxVolume(0);
     pauseStartedAt = Date.now() * 0.001;
     stopHUDUpdate();
-    fadeAudio(Math.min(0.1, getAudioSettings().music), 500);
+    fadeAudio(Math.min(0.1, getAudioSettings().music, gameAudio ? gameAudio.volume : 0), 500);
     if (typeof updateTrainRumble === 'function') updateTrainRumble(0);
     var flash = document.getElementById('screen-flash');
     if (flash) { flash.style.background = 'rgba(0,0,0,0.4)'; flash.style.opacity = '1'; flash.style.transition = 'opacity 0.3s'; }
@@ -599,7 +661,7 @@ window.ssGameStarted = false;
     var pDist = $('#pause-dist');
     if (pScore) pScore.textContent = typeof score !== 'undefined' ? formatNum(Math.floor(score)) : '0';
     if (pCoins) pCoins.textContent = typeof coins_collected !== 'undefined' ? coins_collected : '0';
-    if (pDist) pDist.textContent = (typeof player !== 'undefined' ? Math.floor(-player.pos[2]) : '0') + 'm';
+    if (pDist) pDist.textContent = (typeof runDistance !== 'undefined' ? Math.floor(runDistance) : '0') + 'm';
     syncAudioControls();
     hideHUD();
     showScreen('pause');
@@ -607,9 +669,7 @@ window.ssGameStarted = false;
 
   // ===== Public: Resume =====
   window.uiResumeGame = function () {
-    if (currentScreen !== 'pause') return;
-    if (resumePending) return;
-    resumePending = true;
+    if (currentScreen !== 'pause' || document.hidden) return;
     var flash = document.getElementById('screen-flash');
     if (flash) { flash.style.opacity = '0'; }
     showScreen('playing');
@@ -621,26 +681,39 @@ window.ssGameStarted = false;
       });
       pauseStartedAt = 0;
     }
+    var previousVolume = gameAudio ? gameAudio.volume : 0;
+    setPaused(false);
+    applyAudio();
+    if (gameAudio) gameAudio.volume = previousVolume;
+    if (typeof resumeSfx === 'function') resumeSfx();
     var s = getAudioSettings();
     if (gameAudio && gameAudio.paused && s.music > 0) gameAudio.play().catch(function(){});
     fadeAudio(s.music, 500);
     startHUDUpdate();
-    setTimeout(function () {
-      setPaused(false);
-      resumePending = false;
-    }, 100);
   };
 
   // ===== Public: Restart =====
   window.uiRestartGame = function () {
-    sessionStorage.setItem('ss_skipSplash', 'true');
-    location.reload();
+    if (currentScreen !== 'pause' && currentScreen !== 'gameover') return;
+    setPaused(true);
+    stopHUDUpdate();
+    hideHUD();
+    uiStopRunAudio();
+    showScreen('start');
+    uiStartGame();
   };
 
   // ===== Public: Go to Menu =====
   window.uiGoMenu = function () {
-    sessionStorage.setItem('ss_skipSplash', 'true');
-    location.reload();
+    runGeneration++;
+    setPaused(true);
+    stopHUDUpdate();
+    hideHUD();
+    uiStopRunAudio();
+    $('#screen-flash').style.opacity = '0';
+    if (crashAudio) crashAudio.pause();
+    document.querySelectorAll('.confetti, .achievement-toast, .new-record-burst').forEach(function (el) { el.remove(); });
+    showScreen('start');
   };
 
   // ===== FPS Counter =====
@@ -664,7 +737,6 @@ window.ssGameStarted = false;
     if (currentScreen === 'gameover') return; // guard against double-fire (stats would double-count)
     setPaused(true);
     gameLaunching = false;
-    resumePending = false;
     countdownActive = false;
     if (countdownTimer) {
       clearInterval(countdownTimer);
@@ -707,6 +779,7 @@ window.ssGameStarted = false;
     if (bestV) {
       bestV.textContent = formatNum(getHighScore()) + (isNewBest ? ' ★' : '');
     }
+    var resultGeneration = runGeneration;
     if (isNewBest) {
       // Title carries the record; flash + confetti + burst do the rest
       if (title) {
@@ -715,13 +788,16 @@ window.ssGameStarted = false;
         title.style.textShadow = '0 0 30px rgba(255,215,0,0.5)';
       }
       if (typeof flashScreen === 'function') {
-        setTimeout(function() { flashScreen('rgba(255,215,0,0.2)', 0.4); }, 200);
+        setTimeout(function() {
+          if (currentScreen === 'gameover' && resultGeneration === runGeneration) flashScreen('rgba(255,215,0,0.2)', 0.4);
+        }, 200);
       }
       spawnConfetti();
     }
     // Show achievement unlock toasts (stacked so they don't overlap)
     newAchievements.forEach(function (a, i) {
       setTimeout(function () {
+        if (currentScreen !== 'gameover' || resultGeneration !== runGeneration) return;
         showAchievementToast(a, i);
       }, i * 800 + 500);
     });
@@ -729,6 +805,7 @@ window.ssGameStarted = false;
     // Achievement unlock toast helper
     function showAchievementToast(a, index) {
       var toast = document.createElement('div');
+      toast.className = 'achievement-toast';
       toast.style.cssText =
         'position:fixed; top:' + (80 + index * 56) + 'px; left:50%; transform:translateX(-50%); z-index:500;' +
         'background:rgba(15,15,24,0.95); border:1px solid rgba(255,215,0,0.3);' +
@@ -797,7 +874,8 @@ window.ssGameStarted = false;
     if (btnStatsBack) btnStatsBack.onclick = function () { playClick(); showScreen('start'); };
     if (btnSettingsBack) btnSettingsBack.onclick = function () { playClick(); showScreen('start'); };
     if (btnFullscreen) btnFullscreen.onclick = function () { playClick(); uiToggleFullscreen(); };
-    if (btnWebglBack) btnWebglBack.onclick = function () { playClick(); showScreen('start'); };
+    if (btnWebglBack) btnWebglBack.onclick = function () { location.reload(); };
+    if (btnFullscreen) btnFullscreen.hidden = !document.documentElement.requestFullscreen;
     if (btnShare) {
       // Captured once: re-reading textContent on click would latch the
       // "Shared!" label permanently if the button is clicked twice in a row.
@@ -807,11 +885,12 @@ window.ssGameStarted = false;
         playClick();
         var text = 'I scored ' + formatNum(Math.floor(score || 0)) + ' in Subway Surfers! 🎮';
         var url = 'https://twitter.com/intent/tweet?text=' + encodeURIComponent(text);
-        window.open(url, '_blank', 'width=600,height=400');
+        var popup = window.open(url, '_blank', 'width=600,height=400');
+        if (popup) popup.opener = null;
         if (navigator.clipboard) {
           navigator.clipboard.writeText(text).catch(function(){});
         }
-        btnShare.textContent = '✅ Shared!';
+        btnShare.textContent = popup ? 'Share window opened' : 'Popup blocked';
         if (shareResetTimer) clearTimeout(shareResetTimer);
         shareResetTimer = setTimeout(function () {
           btnShare.textContent = shareLabel;
@@ -846,22 +925,21 @@ window.ssGameStarted = false;
       };
     }
 
-    // Splash toggle (persistent preference; separate from the one-shot
-    // ss_skipSplash session flag used by restart/menu reloads)
+    // Splash preference applies to page loads; runs restart in place.
     if (toggleSplash) {
-      toggleSplash.checked = localStorage.getItem('ss_showIntro') !== 'false';
+      toggleSplash.checked = ssStorage.get('ss_showIntro') !== 'false';
       toggleSplash.onchange = function () {
-        localStorage.setItem('ss_showIntro', toggleSplash.checked ? 'true' : 'false');
+        ssStorage.set('ss_showIntro', toggleSplash.checked ? 'true' : 'false');
       };
     }
     // FPS toggle
     if (toggleFps) {
-      fpsVisible = localStorage.getItem('ss_showFps') === 'true';
+      fpsVisible = ssStorage.get('ss_showFps') === 'true';
       toggleFps.checked = fpsVisible;
       if (fpsEl) fpsEl.classList.toggle('visible', fpsVisible);
       toggleFps.onchange = function () {
         fpsVisible = toggleFps.checked;
-        localStorage.setItem('ss_showFps', fpsVisible ? 'true' : 'false');
+        ssStorage.set('ss_showFps', fpsVisible ? 'true' : 'false');
         if (fpsEl) fpsEl.classList.toggle('visible', fpsVisible);
         frameCount = 0;
         lastFpsTime = performance.now();
@@ -941,6 +1019,8 @@ window.ssGameStarted = false;
         }
       }
       if ((e.key === 'Enter' || e.key === ' ') && currentScreen === 'gameover') {
+        if (e.target.closest && e.target.closest('button, input, select, textarea')) return;
+        e.preventDefault();
         uiRestartGame();
       }
     });
@@ -949,9 +1029,10 @@ window.ssGameStarted = false;
     // wall-clock based, so leaving the game running while hidden would
     // let police/power-up timers drift)
     document.addEventListener('visibilitychange', function () {
-      if (document.hidden && currentScreen === 'playing' && !countdownActive) {
-        uiPauseGame();
-      }
+      if (!document.hidden) return;
+      if (currentScreen === 'playing' && !countdownActive) uiPauseGame();
+      uiStopRunAudio();
+      if (crashAudio) crashAudio.pause();
     });
 
     // Background particles
@@ -975,6 +1056,8 @@ window.ssGameStarted = false;
       });
     });
 
+    hideHUD();
+    Object.keys(screens).forEach(function (key) { if (screens[key]) screens[key].inert = key !== 'start'; });
     applyAudio();
     syncAudioControls();
     updateHighScoreDisplay();
@@ -1041,9 +1124,10 @@ window.ssGameStarted = false;
     if (!ctx) return;
 
     function resize() {
-      var rect = canvas.parentNode.getBoundingClientRect();
-      canvas.width = rect.width;
-      canvas.height = rect.height;
+      var rect = $('#glcanvas').getBoundingClientRect();
+      canvas.style.left = rect.left + 'px'; canvas.style.top = rect.top + 'px';
+      canvas.style.width = rect.width + 'px'; canvas.style.height = rect.height + 'px';
+      canvas.width = rect.width; canvas.height = rect.height;
     }
     resize();
     window.addEventListener('resize', resize);
@@ -1051,11 +1135,14 @@ window.ssGameStarted = false;
     var speedLines = [];
     var speedLineTimer = 0;
 
-    function draw() {
+    var lastFrame = performance.now();
+    function draw(now) {
+      var scale = Math.min(2, (now - lastFrame) * 0.06);
+      lastFrame = now;
       ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-      if (currentScreen === 'playing') {
-        speedLineTimer += 1;
+      if (currentScreen === 'playing' && !gamePaused && !document.hidden) {
+        speedLineTimer += scale;
         if (speedLineTimer > 2) {
           speedLineTimer = 0;
           if (speedLines.length < 40) {
@@ -1071,8 +1158,8 @@ window.ssGameStarted = false;
         }
         for (var i = speedLines.length - 1; i >= 0; i--) {
           var s = speedLines[i];
-          s.x -= s.speed;
-          s.alpha -= 0.008;
+          s.x -= s.speed * scale;
+          s.alpha -= 0.008 * scale;
           if (s.x + s.w < 0 || s.alpha <= 0) {
             speedLines.splice(i, 1);
             continue;
@@ -1103,6 +1190,7 @@ window.ssGameStarted = false;
 
   window.showComboText = function(text, x, y) {
     var el = document.createElement('div');
+    el.className = 'combo-text';
     el.textContent = text;
     el.style.cssText = 'position:fixed;left:' + x + 'px;top:' + y + 'px;'
       + 'font-size:28px;font-weight:900;color:var(--neon-cyan);'

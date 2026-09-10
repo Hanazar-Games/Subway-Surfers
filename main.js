@@ -65,8 +65,7 @@ var theme_flag = 1;
 var obstacle_hit = -1;
 var obstacle_hit_type = ''; // 'duck' | 'jump' | 'rope' — disambiguates the shared index
 
-var jump_height = 0;
-var duck_ground = -5;
+var duckTime = 0;
 var jumping = false;
 var ducking = false;
 var wasInAir = false;
@@ -84,6 +83,7 @@ var currentFov = 70; // starts wide, narrows during intro dive
 
 var score = 0;
 var coins_collected = 0;
+var bonusScore = 0;
 var scoreMultiplier = 1;
 var multiplierStreak = 0;
 var bestStreak = 0;
@@ -125,7 +125,9 @@ var deathTimer = 0;
 var freezeFrame = 0;
 var timeDilation = 1.0;
 
-var cubeRotation = 0;
+var gameGl = null;
+var gameProgramInfo = null;
+var textureLoads = [];
 var vpMatrix = mat4.create(); // shared view-projection for world-to-screen
 var afterimages = []; // player afterimages on lane switch
 var shockwaves = []; // landing shockwave rings
@@ -165,17 +167,17 @@ function initSfx() {
     if (!hasUserActivation()) return;
     var AudioContext = window.AudioContext || window.webkitAudioContext;
     if (!AudioContext) return;
-    audioCtx = new AudioContext();
+    try { audioCtx = new AudioContext(); } catch (e) { return; }
     sfxMasterGain = audioCtx.createGain();
     var storedVolume = 0.5;
     try {
-        var raw = localStorage.getItem('ss_audio');
+        var raw = ssStorage.get('ss_audio');
         if (raw) {
             var v = Number(JSON.parse(raw).sfx);
             if (isFinite(v)) storedVolume = v;
         }
     } catch (e) {}
-    sfxMasterGain.gain.value = Math.max(0, Math.min(1, storedVolume)) * 0.8;
+    sfxMasterGain.gain.value = gamePaused ? 0 : Math.max(0, Math.min(1, storedVolume)) * 0.8;
     sfxMasterGain.connect(audioCtx.destination);
 }
 
@@ -188,7 +190,7 @@ function setSfxVolume(volume) {
 
 function resumeSfx() {
     if (audioCtx && audioCtx.state === 'suspended') {
-        audioCtx.resume();
+        audioCtx.resume().catch(function () {});
     }
 }
 
@@ -505,11 +507,14 @@ function streamWorld(gl, bgDrift) {
   // Flying-boost coins are spawned ad hoc; drop the ones we've run past or the
   // array grows without bound over a long run.
   for (i = coins.length - 1; i >= 0; i--) {
-    if (coins[i].temp && coins[i].pos[2] > behind) coins.splice(i, 1);
+    if (coins[i].temp && coins[i].pos[2] > behind) {
+      coins[i].dispose(gl);
+      coins.splice(i, 1);
+    }
   }
 
   for (i = 0; i < trainF.length; i++)
-    if (trainF[i].pos[2] > behind) placeTrain(i, laneFromRandom(), nextSpawnZ('train', 79));
+    if (trainF[i].pos[2] - 20 > behind) placeTrain(i, laneFromRandom(), nextSpawnZ('train', 79));
   for (i = 0; i < boxes.length; i++)
     if (boxes[i].pos[2] > behind) placeBox(i, laneFromRandom(), nextSpawnZ('box', 73));
   for (i = 0; i < manholes.length; i++)
@@ -528,9 +533,142 @@ function streamWorld(gl, bgDrift) {
     if (hoverboard[i].pos[2] > behind) placePowerUp(hoverboard[i], laneFromRandom(), nextSpawnZ('hover', 250));
 }
 
-main();
+function updateRunScore() {
+  runDistance = Math.max(0, -player.pos[2] - 4);
+  score = runDistance + coins_collected + bonusScore;
+}
 
-function main() {
+function resetGame() {
+  gamePaused = true;
+  player.pos = [-6, -4, -4];
+  player.speedy = 0; player.speedz = SPEED_BASE; player.tilt = 0;
+  player.grounded = true;
+  player.jumping_boots = player.fly_boost = player.hoverboard = false;
+  police.pos = [-6, -4, 0]; police.speedz = SPEED_BASE;
+  dog.pos = [-4, -4.5, -2];
+  jumping = ducking = wasInAir = dying = false;
+  duckTime = deathTimer = freezeFrame = 0;
+  cam_x = target_x = camDip = cameraShake = 0;
+  cam_y = 12; cam_y_target = 5; cam_z = 26; camFollow = 30;
+  target_y = 7;
+  greyScale = flashing = false;
+  currentFov = 70; gameStartAnim = true; theme_flag = 1;
+  player_speed = SPEED_BASE; timeDilation = 1;
+  obstacle_hit = -1; obstacle_hit_type = '';
+  score = coins_collected = bonusScore = runDistance = 0;
+  multiplierStreak = bestStreak = powersCollected = lastMilestone = 0;
+  lastCoinTime = nearMissTimer = trailTimer = sparkTimer = lastAmbientTint = 0;
+  boots_acquired = fb_acquired = hoverboard_acquired = obstacle_hit_time = 0;
+  scoreMultiplier = 1; playerLastX = null;
+  afterimages.length = shockwaves.length = 0;
+  particles.forEach(function (particle) { particle.dispose(gameGl); });
+  particles.length = 0;
+  for (var i = coins.length - 1; i >= 0; i--) {
+    if (coins[i].temp) { coins[i].dispose(gameGl); coins.splice(i, 1); }
+  }
+  spawnFrontier = {};
+  for (var i = 0; i < TRACK_POOL; i++) {
+    track1[i].pos[2] = track2[i].pos[2] = track3[i].pos[2] = WORLD_START_Z - i * TRACK_SPACING;
+  }
+  wall.forEach(function (obj, i) { obj.pos[2] = WORLD_START_Z - i * WALL_SPACING; });
+  city.forEach(function (obj, i) { obj.reseed(gameGl, WORLD_START_Z - i * CITY_SPACING); });
+  coinGroups.forEach(function (group, i) { placeCoinGroup(group, i === 0 ? -30 : spawnFrontier.coin - (10 + Math.random() * 25)); });
+  var layouts = [
+    ['train', trainF, 79, -79, placeTrain], ['box', boxes, 73, -40, placeBox],
+    ['manhole', manholes, 151, -151, placeManhole], ['duck', duck_obs_stop, 61, -30, placeDuck],
+    ['jump', jump_obs, 53, -53, placeJump]
+  ];
+  layouts.forEach(function (layout) {
+    layout[1].forEach(function (_, i) {
+      var z = layout[3] - i * layout[2];
+      layout[4](i, keepOpeningLaneSafe(laneFromRandom(), z), z);
+      spawnFrontier[layout[0]] = z;
+    });
+  });
+  rope_stop.forEach(function (_, i) { placeRope(i, -(i + 1) * 127); spawnFrontier.rope = -(i + 1) * 127; });
+  boots.forEach(function (obj, i) { placePowerUp(obj, laneFromRandom(), -(i + 1) * 103); spawnFrontier.boots = obj.pos[2]; });
+  flying_boost.forEach(function (obj, i) { placePowerUp(obj, laneFromRandom(), -60 - i * 157); spawnFrontier.fly = obj.pos[2]; });
+  hoverboard.forEach(function (obj, i) { placePowerUp(obj, 0, -150 - i * 250); spawnFrontier.hover = obj.pos[2]; });
+  envParticles.forEach(function (obj) { obj.pos = [(Math.random() - 0.5) * 20, Math.random() * 8 - 2, -Math.random() * 100]; });
+  if (_streakPanel) _streakPanel.style.display = 'none';
+  if (_streakBar) _streakBar.style.width = '0%';
+  if (_distFill) _distFill.style.width = '0%';
+  if (_distText) _distText.textContent = '0m';
+  resetGameStartTiming();
+  flash_start_time = startTime;
+  updateTrainRumble(0);
+  drawScene(gameGl, gameProgramInfo, 0);
+}
+
+function updateVerticalMotion(gl, timeScale) {
+  if (player.fly_boost) return;
+  var oldY = player.pos[1], surface = -4;
+  var footY = oldY + (ducking ? 1 : 0);
+  for (var i = 0; i < trainF.length; i++) {
+    if (player.pos[0] === trainF[i].pos[0] && player.pos[2] <= trainF[i].pos[2] && player.pos[2] >= trainF[i].pos[2] - 20) {
+      var top = trainT[i].pos[1] + 1;
+      if (footY >= top - 0.001) surface = Math.max(surface, top);
+    }
+  }
+  for (var i = 0; i < boxes.length; i++) {
+    var top = boxes[i].pos[1] + 2.75;
+    if (player.pos[0] === boxes[i].pos[0] && Math.abs(player.pos[2] - boxes[i].pos[2]) <= 2.5 && footY >= top - 0.001)
+      surface = Math.max(surface, top);
+  }
+  if (player.grounded && footY > surface + 0.001) {
+    player.grounded = false; wasInAir = true;
+    if (ducking) { player.pos[1] += 1; ducking = false; }
+  }
+  if (player.grounded) {
+    if (ducking) {
+      duckTime -= timeScale / 60;
+      if (duckTime <= 0) { player.pos[1] = surface; ducking = false; }
+    }
+    return;
+  }
+  // Integrate the upward and downward portions separately when crossing the apex.
+  var remaining = timeScale;
+  if (player.speedy > 0) {
+    var rise = Math.min(remaining, player.speedy / 0.01);
+    player.pos[1] += player.speedy * rise - 0.005 * rise * rise;
+    player.speedy -= 0.01 * rise;
+    remaining -= rise;
+  }
+  player.pos[1] += player.speedy * remaining - 0.01 * remaining * remaining;
+  player.speedy -= 0.02 * remaining;
+  jumping = player.speedy > 0.000001;
+  if (jumping && Math.random() < 0.3 * timeScale) {
+    particles.push(new Particle(gl,
+      [player.pos[0] + (Math.random() - 0.5) * 0.5, player.pos[1] - 0.5, player.pos[2] + 1],
+      [(Math.random() - 0.5) * 0.5, -0.5 - Math.random(), 3 + Math.random() * 2],
+      0.15 + Math.random() * 0.1, dust_texture));
+  }
+  if (!jumping && player.pos[1] <= surface) {
+    var impactSpeed = -player.speedy;
+    player.pos[1] = surface; player.speedy = 0; player.grounded = true;
+    if (wasInAir) {
+      wasInAir = false; camDip = 0.4;
+      playBumpSound();
+      shockwaves.push({ x: player.pos[0], z: player.pos[2], life: 0.4, maxLife: 0.4 });
+      for (var p = 0; p < 8; p++) particles.push(new Particle(gl, [player.pos[0], surface - 0.2, player.pos[2]], [(Math.random() - 0.5) * 3, Math.random() * 2 + 0.5, (Math.random() - 0.5) * 3], 0.5, dust_texture));
+      if (impactSpeed > 0.15) {
+        bonusScore += 1;
+        var point = worldToScreen(player.pos[0], player.pos[1], player.pos[2]);
+        if (point && typeof showScorePopup === 'function') showScorePopup('+1', point.x, point.y, '#ffffff');
+        if (typeof showComboText === 'function') {
+          var rect = document.getElementById('glcanvas').getBoundingClientRect();
+          showComboText('Nice Landing!', rect.left + rect.width / 2, rect.top + rect.height * 0.45);
+        }
+      }
+    }
+  }
+  police.pos[1] = player.pos[1];
+}
+
+var gameLoadPromise = main();
+gameLoadPromise.catch(function () {});
+
+async function main() {
   try {
     // Cache DOM refs
     _distFill = document.getElementById('distance-fill');
@@ -546,14 +684,9 @@ function main() {
     startTime = d.getTime() * 0.001;
     policeCaughtUp = startTime;
 
-    if (!gl) {
-      alert('Unable to initialize WebGL. Your browser or machine may not support it.');
-      gameReady = true;
-      return;
-    }
-
-    // 标记游戏已初始化完成，允许键盘输入
-    gameReady = true;
+    if (!gl) throw new Error('WebGL is unavailable');
+    gameGl = gl;
+    gameReady = false;
 
   const vsSource = `
   attribute vec4 aVertexPosition;
@@ -578,9 +711,9 @@ function main() {
     highp vec3 directionalLightColor = vec3(1, 1, 1);
     highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
 
-    highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+    highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 0.0);
 
-    highp float directional = max(dot(transformedNormal.xyz, directionalVector), 0.0);
+    highp float directional = max(dot(normalize(transformedNormal.xyz), directionalVector), 0.0);
     vLighting = ambientLight + (directionalLightColor * directional);
 
     // uModelViewMatrix is only the model matrix here (the view matrix is
@@ -614,9 +747,9 @@ function main() {
     highp vec3 directionalLightColor = vec3(1, 1, 1);
     highp vec3 directionalVector = normalize(vec3(0.85, 0.8, 0.75));
 
-    highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 1.0);
+    highp vec4 transformedNormal = uNormalMatrix * vec4(aVertexNormal, 0.0);
 
-    highp float directional = max(dot(transformedNormal.xyz, directionalVector), 1.0);
+    highp float directional = max(dot(normalize(transformedNormal.xyz), directionalVector), 1.0);
     vLighting = ambientLight + (directionalLightColor * directional);
 
     vFogDepth = uCamZ - (uModelViewMatrix * aVertexPosition).z;
@@ -662,9 +795,9 @@ function main() {
 
     void main(void) {
       highp vec4 texelColor = texture2D(uSampler, vTextureCoord);
-      highp vec4 litColor = vec4(texelColor.rrr * vLighting, texelColor.a);
+      highp vec4 litColor = vec4(vec3(dot(texelColor.rgb, vec3(0.299, 0.587, 0.114))) * vLighting, texelColor.a);
 
-      litColor.rgb += texelColor.rrr * uGlow;
+      litColor.rgb += vec3(dot(texelColor.rgb, vec3(0.299, 0.587, 0.114))) * uGlow;
 
       highp float fogAmount = smoothstep(uFogNear, uFogFar, vFogDepth);
       gl_FragColor = mix(litColor, vec4(uFogColor, litColor.a), fogAmount);
@@ -798,6 +931,7 @@ function main() {
 
   player = new Player(gl, [-6, -4, -4]);
   player.speedz = player_speed;
+  player.grounded = true;
   police = new Police(gl, [-6, -4, 0]);
   police.speedz = player_speed;
   dog = new Dog(gl, [player.pos[0] + 2, -4.5, -2])
@@ -947,12 +1081,16 @@ function main() {
     });
   }
 
-  var then = 0;
+  await Promise.all(textureLoads);
+  gameProgramInfo = programInfo;
+  gameReady = true;
+  var then = performance.now() * 0.001;
 
   function render(now) {
+    requestAnimationFrame(render);
     if (typeof uiUpdateFPS === 'function') uiUpdateFPS();
     if (window.gamePaused) {
-      requestAnimationFrame(render);
+      then = now * 0.001;
       return;
     }
     now *= 0.001;  // convert to seconds
@@ -964,7 +1102,7 @@ function main() {
     // dropped frame cannot teleport the player through an obstacle.
     var timeScale = deltaTime * 60;
     if (timeScale > 2) timeScale = 2;
-    else if (timeScale < 0.25) timeScale = 0.25;
+    if (timeScale <= 0) return;
 
     // Select shader program
     var activeProgram = programInfo;
@@ -978,7 +1116,21 @@ function main() {
     if (freezeFrame > 0) {
       freezeFrame--;
       drawScene(gl, activeProgram, 0);
-      requestAnimationFrame(render);
+      return;
+    }
+
+    if (dying) {
+      deathTimer += deltaTime;
+      updateTrainRumble(0);
+      for (var i = particles.length - 1; i >= 0; i--) {
+        particles[i].update(deltaTime);
+        if (particles[i].life <= 0) { particles[i].dispose(gl); particles.splice(i, 1); }
+      }
+      if (deathTimer >= 0.8) {
+        if (typeof uiGameOver === 'function') uiGameOver(score, coins_collected, runDistance);
+        return;
+      }
+      drawScene(gl, activeProgram, deltaTime);
       return;
     }
 
@@ -1001,13 +1153,7 @@ function main() {
     }
 
     // Difficulty scaling: speed slowly increases with distance
-    var distance = -player.pos[2];
-    // The player keeps sliding through the death slow-mo; lock the score at
-    // the moment of impact so the result screen matches what was on the HUD.
-    if (!dying) {
-      score = distance + coins_collected;
-      runDistance = distance;
-    }
+    var distance = Math.max(0, -player.pos[2] - 4);
     // Ease-in difficulty: an easy jog for the opening stretch, then it climbs
     // steadily. Exponent > 1 keeps the first few hundred metres gentle.
     var ramp = Math.min(1, distance / SPEED_RAMP_DIST);
@@ -1021,37 +1167,16 @@ function main() {
       player.speedz = player_speed;
     }
 
-    // Death slow-motion: gradually freeze time then end game
-    if (dying) {
-      deathTimer += deltaTime;
-      player.speedz *= Math.pow(0.85, timeScale);
-      cameraShake *= Math.pow(0.9, timeScale);
-      camFollow += 0.15 * timeScale; // camera pulls back on death
-      if (deathTimer > 0.8) {
-        dying = false;
-        deathTimer = 0;
-        if (typeof uiGameOver === 'function') { uiGameOver(score, coins_collected, runDistance); }
-        return;
-      }
-      // Vignette darkening via screen flash overlay
-      if (typeof flashScreen === 'function' && deathTimer > 0.3) {
-        var darken = Math.min(0.4, (deathTimer - 0.3) * 0.8);
-        flashScreen('rgba(0,0,0,' + darken + ')', 0.05);
-      }
-    }
-
     if (player.jumping_boots) {
       if (d.getTime() * 0.001 - boots_acquired >= 10) {
         player.jumping_boots = false;
-        jump_height = 0;
-        jumping = false;
       }
     }
 
     if (player.fly_boost) {
       if (d.getTime() * 0.001 - fb_acquired >= 10) {
         player.fly_boost = false;
-        player.pos[1] = -4;
+        player.speedy = 0; player.grounded = false; wasInAir = true;
         dog.pos[2] = player.pos[2] + 2;
         cam_y_target = 5;
         jumping = false;
@@ -1061,7 +1186,6 @@ function main() {
     if (player.hoverboard) {
       if (d.getTime() * 0.001 - hoverboard_acquired >= 10) {
         player.hoverboard = false;
-        jumping = false;
       }
     }
 
@@ -1081,8 +1205,8 @@ function main() {
 
     // start-of-game camera push-in animation
     if (gameStartAnim) {
-      camFollow += (CAM_FOLLOW_DIST - camFollow) * 0.08 * timeScale;
-      currentFov += (45 - currentFov) * 0.08 * timeScale;
+      camFollow += (CAM_FOLLOW_DIST - camFollow) * (1 - Math.pow(0.92, timeScale));
+      currentFov += (45 - currentFov) * (1 - Math.pow(0.92, timeScale));
       if (camFollow - CAM_FOLLOW_DIST < 0.05) {
         camFollow = CAM_FOLLOW_DIST;
         currentFov = 45;
@@ -1096,7 +1220,7 @@ function main() {
       if (camDip < 0.005) camDip = 0;
     }
     var camDiff = (cam_y_target - camDip) - cam_y;
-    cam_y += camDiff * Math.min(1, 0.08 * timeScale);
+    cam_y += camDiff * (1 - Math.pow(0.92, timeScale));
     // Look 5 down over 10 forward (~26.6 degrees). Steeper than this and the
     // vanishing point climbs above the top of the frame, which left only ~28
     // units of track visible ahead of the player — under a second of warning.
@@ -1146,7 +1270,7 @@ function main() {
     dog.pos[0] = player.pos[0] + 2;
 
     // Distance milestone celebration
-    var dist = Math.floor(-player.pos[2]);
+    var dist = Math.floor(Math.max(0, -player.pos[2] - 4));
     if (dist >= lastMilestone + 100) {
       lastMilestone = dist - (dist % 100);
       if (typeof flashScreen === 'function') flashScreen('#ffffff', 0.2);
@@ -1199,120 +1323,7 @@ function main() {
       }
     }
 
-    if (!player.fly_boost) {
-      // jump
-      if (jumping) {
-        player.pos[1] += player.speedy * timeScale;
-        player.speedy -= 0.01 * timeScale;
-        police.pos[1] = player.pos[1];
-        // Wind streak particles on jump
-        if (Math.random() < 0.3) {
-          particles.push(new Particle(gl,
-            [player.pos[0] + (Math.random()-0.5)*0.5, player.pos[1] - 0.5, player.pos[2] + 1.0],
-            [(Math.random()-0.5)*0.5, -0.5 - Math.random(), 3.0 + Math.random()*2.0],
-            0.15 + Math.random()*0.1, dust_texture));
-        }
-        if (player.pos[1] >= jump_height) {
-          player.pos[1] = jump_height;
-          jumping = false;
-          player.speedy = 0.05;
-          wasInAir = true;
-        }
-      }
-
-      if (jumping == false) {
-        if (player.pos[1] > -4) {
-          player.speedy += 0.02 * timeScale;
-          player.pos[1] -= player.speedy * timeScale;
-          // jump onto train
-          var n = trainF.length;
-          for (var i = 0; i < n; i++) {
-            if (player.pos[0] == trainF[i].pos[0]) {
-              if (player.pos[1] <= trainT[i].pos[1] + 1 && player.pos[1] >= trainT[i].pos[1]) {
-                if (player.pos[2] <= trainF[i].pos[2] && player.pos[2] >= trainF[i].pos[2] - 20) {
-                  player.pos[1] = trainT[i].pos[1] + 1;
-                  break;
-                }
-              }
-            }
-          }
-          // jump onto box
-          var numBoxes = boxes.length;
-          for (var i = 0; i < numBoxes; i++) {
-            if (player.pos[0] == boxes[i].pos[0]) {
-              if (player.pos[1] <= boxes[i].pos[1] + 3.5) {
-                if (player.pos[2] <= boxes[i].pos[2] + 3.5 && player.pos[2] >= boxes[i].pos[2] - 3.5) {
-                  player.pos[1] = boxes[i].pos[1] + 3.5;
-                  break;
-                }
-              }
-            }
-          }
-          if (player.pos[1] < -4 && !ducking) {
-            if (wasInAir) {
-              wasInAir = false;
-              // Landing camera dip (springs back; permanently lowering
-              // cam_y_target would sink the camera through the track)
-              camDip = 0.4;
-              if (typeof playBumpSound === 'function') playBumpSound();
-              for (var p = 0; p < 8; p++) {
-                var vx = (Math.random() - 0.5) * 3.0;
-                var vy = Math.random() * 2.0 + 0.5;
-                var vz = (Math.random() - 0.5) * 3.0;
-                particles.push(new Particle(gl, [player.pos[0], -4.2, player.pos[2]], [vx, vy, vz], 0.4 + Math.random() * 0.3, dust_texture));
-              }
-              shockwaves.push({ x: player.pos[0], z: player.pos[2], life: 0.4, maxLife: 0.4 });
-              // Perfect landing bonus from high fall
-              if (player.speedy > 0.15) {
-                coins_collected += 1;
-                if (typeof showScorePopup === 'function') {
-                  var sp = worldToScreen(player.pos[0], player.pos[1], player.pos[2]);
-                  if (sp) showScorePopup('+1', sp.x, sp.y, '#ffffff');
-                }
-                if (typeof showComboText === 'function') {
-                  var rect = document.getElementById('glcanvas').getBoundingClientRect();
-                  showComboText('Nice Landing!', rect.left + rect.width / 2, rect.top + rect.height * 0.45);
-                }
-              }
-            }
-            player.pos[1] = -4;
-            player.speedy = 0;
-          }
-          police.pos[1] = player.pos[1];
-        }
-      }
-
-      // duck
-      if (ducking) {
-        player.pos[1] -= player.speedy * timeScale;
-        police.pos[1] = player.pos[1];
-        if (player.pos[1] <= duck_ground) {
-          ducking = false;
-          player.speedy = 0.05;
-        }
-      }
-
-      if (ducking == false) {
-        if (player.pos[1] < -4) {
-          player.pos[1] += player.speedy * timeScale;
-          if (player.pos[1] > -4 && !jumping) {
-            if (wasInAir) {
-              wasInAir = false;
-              for (var p = 0; p < 8; p++) {
-                var vx = (Math.random() - 0.5) * 3.0;
-                var vy = Math.random() * 2.0 + 0.5;
-                var vz = (Math.random() - 0.5) * 3.0;
-                particles.push(new Particle(gl, [player.pos[0], -4.2, player.pos[2]], [vx, vy, vz], 0.4 + Math.random() * 0.3, dust_texture));
-              }
-              shockwaves.push({ x: player.pos[0], z: player.pos[2], life: 0.4, maxLife: 0.4 });
-            }
-            player.pos[1] = -4;
-            player.speedy = 0.05;
-          }
-          police.pos[1] = player.pos[1];
-        }
-      }
-    }
+    updateVerticalMotion(gl, timeScale);
 
     // train movement
     var num_trains = trainF.length;
@@ -1399,7 +1410,8 @@ function main() {
                 var screenY = rect.top + rect.height * 0.4;
                 showComboText(multiplierStreak + ' combo!', screenX, screenY);
               }
-              coins_collected += scoreMultiplier;
+              coins_collected += 1;
+              bonusScore += scoreMultiplier - 1;
               safeVibrate(10);
               if (_streakEl && _streakPanel) {
                 _streakEl.textContent = multiplierStreak;
@@ -1429,6 +1441,8 @@ function main() {
       }
     }
 
+    updateRunScore();
+
     // Train proximity rumble. Computed outside the hoverboard guard below —
     // otherwise an in-progress rumble would hold its volume for the whole
     // 10s power-up instead of fading as the train passes.
@@ -1451,7 +1465,7 @@ function main() {
           if (player.pos[1] >= trainF[i].pos[1] - 4 && player.pos[1] <= trainF[i].pos[1] + 4) {
             if (player.pos[2] >= trainF[i].pos[2] - 18 && player.pos[2] <= trainF[i].pos[2]) {
               if (dying) break;
-              score = -player.pos[2] + coins_collected;
+              updateRunScore();
               cameraShake = 0.8; safeVibrate(100);
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
@@ -1472,7 +1486,7 @@ function main() {
             var now = Date.now() * 0.001;
             if (now - nearMissTimer > 1.0) {
               nearMissTimer = now;
-              coins_collected += 1;
+              bonusScore += 1;
               playCoinSound();
               if (typeof showComboText === 'function') {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
@@ -1491,10 +1505,11 @@ function main() {
       var num_boxes = boxes.length;
       for (var i = 0; i < num_boxes; i++) {
         if (player.pos[0] == boxes[i].pos[0]) {
-          if (player.pos[1] >= boxes[i].pos[1] - 2 && player.pos[1] <= boxes[i].pos[1] + 2) {
+          var supportedY = player.pos[1] + (ducking ? 1 : 0);
+          if (supportedY >= boxes[i].pos[1] - 2 && supportedY <= boxes[i].pos[1] + 2) {
             if (player.pos[2] <= boxes[i].pos[2] + 3 && player.pos[2] >= boxes[i].pos[2] - 3) {
               if (dying) break;
-              score = -player.pos[2] + coins_collected;
+              updateRunScore();
               cameraShake = 0.8; safeVibrate(100);
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
@@ -1520,7 +1535,7 @@ function main() {
           if (player.pos[1] <= -4) {
             if (player.pos[2] <= manholes[i].pos[2] + 2.3 && player.pos[2] >= manholes[i].pos[2] - 2.3) {
               if (dying) break;
-              score = -player.pos[2] + coins_collected;
+              updateRunScore();
               cameraShake = 0.8; safeVibrate(100);
               if (typeof flashScreen === 'function') flashScreen('#ff0000', 0.5);
               // Death explosion particles
@@ -1578,7 +1593,7 @@ function main() {
                 if (dying) break;
                 d = new Date();
                 if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
-                  score = -player.pos[2] + coins_collected;
+                  updateRunScore();
                   Die();
                   if (typeof uiGameOver === 'function') { uiGameOver(score, coins_collected, runDistance); return; }
                 }
@@ -1607,7 +1622,7 @@ function main() {
               if (dying) break;
               d = new Date();
               if (d.getTime() * 0.001 - policeCaughtUp <= 10) {
-                score = -player.pos[2] + coins_collected;
+                updateRunScore();
                 Die();
                 if (typeof uiGameOver === 'function') { uiGameOver(score, coins_collected, runDistance); return; }
               }
@@ -1627,38 +1642,10 @@ function main() {
       }
     }
 
-    // // train and box
-    // for (var i = 0; i < num_trains; i++) {
-    //   for (var j = 0; j < num_boxes; j++) {
-    //     if (boxes[j].pos[0] == trainF[i].pos[0]) {
-    //       if (boxes[j].pos[2] - 5 <= trainF[i].pos[2] && boxes[j].pos[2] - 4.5 >= trainF[i].pos[2]) {
-    //         train_speeds[i] = 0;
-    //       }
-    //     }
-    //   }
-    // }
-
-    // // train and duck_obs
-    // for (var i = 0; i < num_trains; i++) {
-    //   for (var j = 0; j < num_high; j++) {
-    //     if (trainF[i].pos[0] == duck_obs_stop[j].pos[0]) {
-    //       if (trainF[i].pos[2] >= duck_obs_stop[j].pos[2] - 5 && trainF[i].pos[2] <= duck_obs_stop[j].pos[2] - 4.5) {
-    //         train_speeds[i] = 0;
-    //       }
-    //     }
-    //   }
-    // }
-
-    // // train and jump_obs
-    // for (var i = 0; i < num_trains; i++) {
-    //   for (var j = 0; j < num_low; j++) {
-    //     if (trainF[i].pos[0] == jump_obs[j].pos[0]) {
-    //       if (trainF[i].pos[2] >= jump_obs[j].pos[2] - 5 && trainF[i].pos[2] <= jump_obs[j].pos[2] - 4.5) {
-    //         train_speeds[i] = 0;
-    //       }
-    //     }
-    //   }
-    // }
+    if (dying) {
+      drawScene(gl, activeProgram, 0);
+      return;
+    }
 
     // collision with jumping boots
     var num_boots = boots.length;
@@ -1685,8 +1672,6 @@ function main() {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Jump Boots!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
               }
-              jump_height = 3;
-              jumping = false;
             }
           }
         }
@@ -1713,6 +1698,7 @@ function main() {
               }
               dog.pos[2] -= 10;
               player.pos[1] = 10;
+              player.speedy = 0; player.grounded = false; ducking = false;
               cam_y_target = player.pos[1] + 9;
               d = new Date();
               fb_acquired = d.getTime() * 0.001;
@@ -1774,7 +1760,6 @@ function main() {
                 var rect = document.getElementById('glcanvas').getBoundingClientRect();
                 showComboText('Hoverboard!', rect.left + rect.width / 2, rect.top + rect.height * 0.35);
               }
-              jumping = false;
             }
           }
         }
@@ -1783,7 +1768,7 @@ function main() {
 
     // Decay score multiplier if no coin collected recently
     var nowTime = Date.now() * 0.001;
-    if (nowTime - lastCoinTime >= 2.0 && scoreMultiplier > 1) {
+    if (nowTime - lastCoinTime >= 2.0 && multiplierStreak > 0) {
       scoreMultiplier = 1;
       multiplierStreak = 0;
       if (_streakPanel) _streakPanel.style.display = 'none';
@@ -1855,6 +1840,7 @@ function main() {
     for (var i = particles.length - 1; i >= 0; i--) {
       particles[i].update(deltaTime * timeDilation);
       if (particles[i].life <= 0) {
+        particles[i].dispose(gl);
         particles.splice(i, 1);
       }
     }
@@ -1873,7 +1859,7 @@ function main() {
     for (var i = 0; i < envParticles.length; i++) {
       var ep = envParticles[i];
       ep.pos[0] += ep.vel[0] * envDt;
-      ep.pos[1] += ep.vel[1] * envDt + Math.sin(dustTime + ep.phase) * 0.002;
+      ep.pos[1] += ep.vel[1] * envDt + Math.sin(dustTime + ep.phase) * 0.002 * timeScale;
       ep.pos[2] += ep.vel[2] * envDt;
       // wrap around relative to camera
       if (ep.pos[2] > cam_z + 5) ep.pos[2] -= 90;
@@ -1898,12 +1884,14 @@ function main() {
     cam_x = origCamX;
     cam_y = origCamY;
 
-    requestAnimationFrame(render);
+    if (!dying) updateRunScore();
   }
+  drawScene(gl, programInfo, 0);
   requestAnimationFrame(render);
   } catch (e) {
     console.error('Game initialization error:', e);
-    gameReady = true;
+    gameReady = false;
+    throw e;
   }
 }
 
@@ -1912,7 +1900,7 @@ function worldToScreen(wx, wy, wz) {
               vpMatrix[1]*wx + vpMatrix[5]*wy + vpMatrix[9]*wz + vpMatrix[13],
               vpMatrix[2]*wx + vpMatrix[6]*wy + vpMatrix[10]*wz + vpMatrix[14],
               vpMatrix[3]*wx + vpMatrix[7]*wy + vpMatrix[11]*wz + vpMatrix[15]];
-  if (clip[3] === 0) return null;
+  if (clip[3] <= 0) return null;
   var ndcX = clip[0] / clip[3];
   var ndcY = clip[1] / clip[3];
   var canvas = document.getElementById('glcanvas');
@@ -1942,23 +1930,20 @@ function resizeCanvasToDisplay(gl) {
 function drawScene(gl, programInfo, deltaTime) {
   resizeCanvasToDisplay(gl);
 
-  if (theme_flag == 1) {
-    applyTheme(theme);
-    if (theme == 1) {
-      // Subtle warm shift as speed increases
-      var speedRatio = speedRatio01();
-      var r = 144 / 256 + speedRatio * 0.05;
-      var g = 228 / 256 - speedRatio * 0.02;
-      var b = 252 / 256 - speedRatio * 0.05;
-      gl.clearColor(r, g, b, 1.0);
-      if (greyScale)
-        gl.clearColor(50 / 255, 50 / 255, 50 / 255, 1.0);
-    }
-    if (theme == 2) {
-      gl.clearColor(0, 0, 0, 1.0);
-    }
-    theme_flag = 0;
+  if (theme_flag == 1) applyTheme(theme);
+  if (theme == 1) {
+    // Subtle warm shift as speed increases
+    var speedRatio = speedRatio01();
+    var r = 144 / 256 + speedRatio * 0.05;
+    var g = 228 / 256 - speedRatio * 0.02;
+    var b = 252 / 256 - speedRatio * 0.05;
+    gl.clearColor(r, g, b, 1.0);
   }
+  if (theme == 2) {
+    gl.clearColor(0, 0, 0, 1.0);
+  }
+  if (greyScale) gl.clearColor(0.2, 0.2, 0.2, 1.0);
+  theme_flag = 0;
 
   gl.clearDepth(1.0);
   gl.enable(gl.DEPTH_TEST);
@@ -1967,7 +1952,7 @@ function drawScene(gl, programInfo, deltaTime) {
   gl.clear(gl.COLOR_BUFFER_BIT | gl.DEPTH_BUFFER_BIT);
 
   var targetFov = 45 + speedRatio01() * 12;
-  currentFov += (targetFov - currentFov) * 0.05;
+  currentFov += (targetFov - currentFov) * (1 - Math.pow(0.95, deltaTime * 60));
   const fieldOfView = currentFov * Math.PI / 180;
   const aspect = gl.canvas.clientWidth / gl.canvas.clientHeight;
   // Nothing is ever closer than ~8 units, so a roomier zNear buys back the
@@ -2035,6 +2020,29 @@ function drawScene(gl, programInfo, deltaTime) {
     }
   }
 
+  // Obstacle shadows
+  gl.disable(gl.DEPTH_TEST);
+  drawShadow(gl, vpMatrix, programInfo, player.pos[0], player.pos[1] - 1.02, player.pos[2], 0.35, 0.22);
+  for (var i = 0; i < num_trains; i++) {
+    if (trainF[i].pos[2] < cullNear && trainF[i].pos[2] > cullFar) {
+      if (typeof drawShadow === 'function')
+        drawShadow(gl, vpMatrix, programInfo, trainF[i].pos[0], -5.1, trainF[i].pos[2] - 5, 2.0, 8.0);
+    }
+  }
+  for (var i = 0; i < num_boxes; i++) {
+    if (boxes[i].pos[2] < cullNear && boxes[i].pos[2] > cullFar) {
+      if (typeof drawShadow === 'function')
+        drawShadow(gl, vpMatrix, programInfo, boxes[i].pos[0], -5.1, boxes[i].pos[2], 1.8, 1.8);
+    }
+  }
+  for (var i = 0; i < num_manholes; i++) {
+    if (manholes[i].pos[2] < cullNear && manholes[i].pos[2] > cullFar) {
+      if (typeof drawShadow === 'function')
+        drawShadow(gl, vpMatrix, programInfo, manholes[i].pos[0], -5.05, manholes[i].pos[2], 1.5, 1.5);
+    }
+  }
+  gl.enable(gl.DEPTH_TEST);
+
   // Ground warning decals improve obstacle readability at high speed.
   if (typeof drawGlow === 'function') {
     for (var hm = 0; hm < hazardMarkers.length; hm++) {
@@ -2055,36 +2063,15 @@ function drawScene(gl, programInfo, deltaTime) {
 
   // Power-up expiry blink (last 3 seconds)
   var nowSecs = Date.now() * 0.001;
-  var minRem = 10;
+  var minRem = 10, playerAlpha = 1;
   if (player.jumping_boots) minRem = Math.min(minRem, 10 - (nowSecs - boots_acquired));
   if (player.fly_boost) minRem = Math.min(minRem, 10 - (nowSecs - fb_acquired));
   if (player.hoverboard) minRem = Math.min(minRem, 10 - (nowSecs - hoverboard_acquired));
   if (minRem < 3 && (player.jumping_boots || player.fly_boost || player.hoverboard)) {
     var blink = 0.5 + 0.5 * Math.sin(Date.now() * 0.015);
-    gl.uniform1f(programInfo.uniformLocations.uAlpha, blink);
+    playerAlpha = blink;
   }
-  player.drawCube(gl, vpMatrix, programInfo, deltaTime);
-  gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
-
-  // Afterimages on lane switch
-  for (var ai = 0; ai < afterimages.length; ai++) {
-    var aimg = afterimages[ai];
-    var alpha = aimg.life / aimg.maxLife * 0.5;
-    gl.uniform1f(programInfo.uniformLocations.uAlpha, alpha);
-    var origX = player.pos[0];
-    var origY = player.pos[1];
-    var origZ = player.pos[2];
-    var origTilt = player.tilt;
-    player.pos[0] = aimg.x;
-    player.pos[1] = aimg.y;
-    player.pos[2] = aimg.z;
-    player.tilt = aimg.tilt;
-    player.drawCube(gl, vpMatrix, programInfo, deltaTime);
-    player.pos[0] = origX;
-    player.pos[1] = origY;
-    player.pos[2] = origZ;
-    player.tilt = origTilt;
-  }
+  if (playerAlpha === 1) player.drawCube(gl, vpMatrix, programInfo, deltaTime);
   gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
 
   police.drawCube(gl, vpMatrix, programInfo, deltaTime);
@@ -2096,23 +2083,14 @@ function drawScene(gl, programInfo, deltaTime) {
       coins[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
-  // draw particles on top of coins
-  for (var i = 0; i < particles.length; i++) {
-    if (particles[i].pos[2] < cullNear && particles[i].pos[2] > cullFar)
-      particles[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
-  }
-
   for (var i = 0; i < num_trains; i++) {
-    if (trainF[i].pos[2] < cullNear && trainF[i].pos[2] > cullFar) {
+    if (trainF[i].pos[2] - 20 < cullNear && trainF[i].pos[2] > cullFar) {
       trainF[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
       trainT[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
       trainL[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
       trainR[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+      for (var part = 0; part < 6; part++) trainExtra[i * 6 + part].drawCube(gl, vpMatrix, programInfo, deltaTime);
     }
-  }
-  for (var i = 0; i < trainExtra.length; i++) {
-    if (trainExtra[i].pos[2] < cullNear && trainExtra[i].pos[2] > cullFar)
-      trainExtra[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
   // Train headlight glows (drawn after opaque geometry with additive blend)
@@ -2124,28 +2102,6 @@ function drawScene(gl, programInfo, deltaTime) {
       }
     }
   }
-
-  // Obstacle shadows
-  gl.disable(gl.DEPTH_TEST);
-  for (var i = 0; i < num_trains; i++) {
-    if (trainF[i].pos[2] < cullNear && trainF[i].pos[2] > cullFar) {
-      if (typeof drawShadow === 'function')
-        drawShadow(gl, vpMatrix, programInfo, trainF[i].pos[0], -5.1, trainF[i].pos[2] - 5, 2.0, 8.0);
-    }
-  }
-  for (var i = 0; i < num_boxes; i++) {
-    if (boxes[i].pos[2] < cullNear && boxes[i].pos[2] > cullFar) {
-      if (typeof drawShadow === 'function')
-        drawShadow(gl, vpMatrix, programInfo, boxes[i].pos[0], -5.1, boxes[i].pos[2], 1.8, 1.8);
-    }
-  }
-  for (var i = 0; i < num_manholes; i++) {
-    if (manholes[i].pos[2] < cullNear && manholes[i].pos[2] > cullFar) {
-      if (typeof drawShadow === 'function')
-        drawShadow(gl, vpMatrix, programInfo, manholes[i].pos[0], -5.05, manholes[i].pos[2], 1.5, 1.5);
-    }
-  }
-  gl.enable(gl.DEPTH_TEST);
 
   // Landing shockwaves (expanding rings)
   if (typeof drawGlow === 'function') {
@@ -2213,6 +2169,35 @@ function drawScene(gl, programInfo, deltaTime) {
       hoverboard[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
   }
 
+  if (playerAlpha < 1) player.drawCube(gl, vpMatrix, programInfo, deltaTime, playerAlpha);
+
+  // Afterimages on lane switch
+  for (var ai = 0; ai < afterimages.length; ai++) {
+    var aimg = afterimages[ai];
+    var alpha = aimg.life / aimg.maxLife * 0.5;
+    gl.uniform1f(programInfo.uniformLocations.uAlpha, alpha);
+    var origX = player.pos[0];
+    var origY = player.pos[1];
+    var origZ = player.pos[2];
+    var origTilt = player.tilt;
+    player.pos[0] = aimg.x;
+    player.pos[1] = aimg.y;
+    player.pos[2] = aimg.z;
+    player.tilt = aimg.tilt;
+    player.drawCube(gl, vpMatrix, programInfo, deltaTime, alpha);
+    player.pos[0] = origX;
+    player.pos[1] = origY;
+    player.pos[2] = origZ;
+    player.tilt = origTilt;
+  }
+  gl.uniform1f(programInfo.uniformLocations.uAlpha, 1.0);
+
+  // draw particles on top of coins
+  for (var i = 0; i < particles.length; i++) {
+    if (particles[i].pos[2] < cullNear && particles[i].pos[2] > cullFar)
+      particles[i].drawCube(gl, vpMatrix, programInfo, deltaTime);
+  }
+
   // Ambient dust particles (tiny glowing motes)
   if (typeof drawGlow === 'function') {
     for (var i = 0; i < envParticles.length; i++) {
@@ -2235,8 +2220,7 @@ function initShaderProgram(gl, vsSource, fsSource) {
   gl.linkProgram(shaderProgram);
 
   if (!gl.getProgramParameter(shaderProgram, gl.LINK_STATUS)) {
-    alert('Unable to initialize the shader program: ' + gl.getProgramInfoLog(shaderProgram));
-    return null;
+    throw new Error('Unable to initialize shaders: ' + gl.getProgramInfoLog(shaderProgram));
   }
 
   return shaderProgram;
@@ -2259,33 +2243,27 @@ function loadTexture(gl, url) {
     pixel);
 
   const image = new Image();
-  image.onload = function () {
-    gl.bindTexture(gl.TEXTURE_2D, texture);
-    var source = image;
-    var uploadWidth = image.width;
-    var uploadHeight = image.height;
-    try {
-      var canvas = document.createElement('canvas');
-      canvas.width = image.width;
-      canvas.height = image.height;
-      var ctx = canvas.getContext('2d');
-      ctx.drawImage(image, 0, 0);
-      source = canvas;
-      uploadWidth = canvas.width;
-      uploadHeight = canvas.height;
-    } catch (e) {}
-    gl.texImage2D(gl.TEXTURE_2D, level, internalFormat,
-      srcFormat, srcType, source);
-
-    if (isPowerOf2(uploadWidth) && isPowerOf2(uploadHeight)) {
-      gl.generateMipmap(gl.TEXTURE_2D);
-    } else {
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
-      gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
-    }
-  };
-  image.src = url;
+  textureLoads.push(new Promise(function (resolve, reject) {
+    image.onerror = function () { reject(new Error('Unable to load ' + url)); };
+    image.onload = function () {
+      try {
+        var canvas = document.createElement('canvas');
+        canvas.width = image.width; canvas.height = image.height;
+        canvas.getContext('2d').drawImage(image, 0, 0);
+        gl.bindTexture(gl.TEXTURE_2D, texture);
+        gl.texImage2D(gl.TEXTURE_2D, level, internalFormat, srcFormat, srcType, canvas);
+        if (isPowerOf2(canvas.width) && isPowerOf2(canvas.height)) {
+          gl.generateMipmap(gl.TEXTURE_2D);
+        } else {
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_S, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_WRAP_T, gl.CLAMP_TO_EDGE);
+          gl.texParameteri(gl.TEXTURE_2D, gl.TEXTURE_MIN_FILTER, gl.LINEAR);
+        }
+        resolve();
+      } catch (error) { reject(error); }
+    };
+    image.src = url + '?v=' + document.querySelector('meta[name="application-version"]').content;
+  }));
 
   return texture;
 }
@@ -2302,15 +2280,16 @@ function loadShader(gl, type, source) {
   gl.compileShader(shader);
 
   if (!gl.getShaderParameter(shader, gl.COMPILE_STATUS)) {
-    alert('An error occurred compiling the shaders: ' + gl.getShaderInfoLog(shader));
+    var message = gl.getShaderInfoLog(shader);
     gl.deleteShader(shader);
-    return null;
+    throw new Error('Unable to compile shaders: ' + message);
   }
 
   return shader;
 }
 
 function Die() {
+  if (typeof uiStopRunAudio === 'function') uiStopRunAudio();
   var music = document.getElementById('music');
   var crash = document.getElementById('crash');
   if (music) music.pause();

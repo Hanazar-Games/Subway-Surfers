@@ -61,6 +61,7 @@ html, body {
   width: min(1280px, calc(100vw - 40px), calc((100vh - 40px) * 16 / 9));
   height: auto;
   aspect-ratio: 16 / 9;
+  touch-action: none;
 }
 
 /* ===== Screen System ===== */
@@ -71,7 +72,7 @@ html, body {
   align-items: center; justify-content: center;
   padding: max(16px, env(safe-area-inset-top)) max(16px, env(safe-area-inset-right)) max(16px, env(safe-area-inset-bottom)) max(16px, env(safe-area-inset-left));
   background: var(--bg-primary);
-  transition: opacity 0.5s var(--transition-normal), visibility 0.5s;
+  transition: opacity var(--transition-slow), visibility 0.5s;
 }
 .ui-screen.hidden {
   opacity: 0; visibility: hidden; pointer-events: none;
@@ -87,7 +88,7 @@ html, body {
   background: rgba(7, 7, 12, 0.85);
   backdrop-filter: blur(12px) saturate(1.2);
   -webkit-backdrop-filter: blur(12px) saturate(1.2);
-  transition: opacity 0.35s var(--transition-normal), visibility 0.35s;
+  transition: opacity 0.35s ease, visibility 0.35s;
 }
 .ui-overlay.hidden {
   opacity: 0; visibility: hidden; pointer-events: none;
@@ -233,9 +234,10 @@ html, body {
   justify-content: space-between;
   padding: 20px 28px;
   opacity: 0;
-  transition: opacity 0.4s var(--transition-normal);
+  transition: opacity 0.4s ease;
 }
 #hud.visible { opacity: 1; }
+#hud:not(.visible), .touch-controls:not(.visible) { visibility: hidden; }
 #hud > * { pointer-events: auto; }
 
 .hud-top {
@@ -244,6 +246,7 @@ html, body {
 .hud-left, .hud-right {
   display: flex; flex-direction: column; gap: 10px;
 }
+.hud-right { align-items: flex-end; }
 
 .hud-panel {
   background: rgba(0,0,0,0.45);
@@ -282,7 +285,7 @@ html, body {
   height: 6px;
   background: rgba(255,255,255,0.08);
   border-radius: 3px;
-  overflow: hidden;
+  overflow: visible;
   z-index: 160;
   opacity: 0;
   transition: opacity 0.5s ease;
@@ -306,7 +309,7 @@ html, body {
   font-weight: 600;
   letter-spacing: 1px;
   text-transform: uppercase;
-  color: var(--text-muted);
+  color: var(--text-secondary);
   white-space: nowrap;
 }
 
@@ -564,13 +567,20 @@ html, body {
 
 /* ===== Toggle Switch ===== */
 .toggle-row {
+  position: relative;
   display: flex; align-items: center; gap: 12px;
   cursor: pointer;
   font-size: 14px; color: var(--text-secondary);
 }
 .toggle-row input {
-  display: none;
+  position: absolute;
+  width: 44px; height: 24px;
+  opacity: 0;
+  z-index: 1;
+  cursor: pointer;
 }
+.toggle-row input:focus-visible + .toggle-slider,
+.volume-slider:focus-visible { outline: 2px solid var(--neon-cyan); outline-offset: 4px; }
 .toggle-slider {
   width: 44px; height: 24px;
   background: rgba(255,255,255,0.1);
@@ -622,7 +632,7 @@ html, body {
 
 /* ===== High Score Badge ===== */
 .hud-highscore {
-  position: fixed; top: 20px; right: 28px;
+  position: fixed; top: 20px; right: 180px;
   z-index: 151;
   background: rgba(0,0,0,0.45);
   backdrop-filter: blur(8px);
@@ -896,6 +906,8 @@ html, body {
 }
 
 @media (max-width: 640px) {
+  #hud { padding: 16px; }
+  .hud-highscore { top: 120px; right: 16px; }
   .glass-card {
     min-width: 0;
     width: calc(100vw - 32px);
@@ -920,14 +932,6 @@ html, body {
     gap: 16px;
     flex-wrap: wrap;
   }
-  .key-hint {
-    bottom: 110px;
-    gap: 10px;
-    padding: 10px 12px;
-    max-width: calc(100vw - 24px);
-    flex-wrap: wrap;
-    justify-content: center;
-  }
   .hud-top {
     align-items: flex-start;
     gap: 8px;
@@ -944,6 +948,19 @@ html, body {
     width: 58px;
     height: 58px;
   }
+}
+
+@media (max-width: 768px), (hover: none), (pointer: coarse) {
+  .key-hint { display: none; }
+  .distance-bar { bottom: max(184px, calc(env(safe-area-inset-bottom) + 164px)); width: min(260px, calc(100vw - 48px)); }
+}
+@media (max-height: 500px) and (max-width: 768px) {
+  .touch-col { display: contents; }
+  .touch-btn { width: 52px; height: 52px; }
+  .distance-bar { bottom: max(92px, calc(env(safe-area-inset-bottom) + 72px)); }
+  .hud-left { gap: 6px; }
+  .hud-panel { padding: 4px 8px; }
+  .hud-value { font-size: 18px; }
 }
 
 /* ===== Combo floating text animation ===== */

@@ -114,16 +114,16 @@ let Player = class {
             0.0, -1.0, 0.0,
             0.0, -1.0, 0.0,
             0.0, -1.0, 0.0,
-            // Right
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
-            1.0, 0.0, 0.0,
             // Left
             -1.0, 0.0, 0.0,
             -1.0, 0.0, 0.0,
             -1.0, 0.0, 0.0,
-            -1.0, 0.0, 0.0
+            -1.0, 0.0, 0.0,
+            // Right
+            1.0, 0.0, 0.0,
+            1.0, 0.0, 0.0,
+            1.0, 0.0, 0.0,
+            1.0, 0.0, 0.0
         ];
         gl.bufferData(gl.ARRAY_BUFFER, new Float32Array(vertexNormals), gl.STATIC_DRAW);
 
@@ -267,12 +267,7 @@ let Player = class {
         gl.drawElements(gl.TRIANGLES, 36, gl.UNSIGNED_SHORT, 0);
     }
 
-    drawCube(gl, projectionMatrix, programInfo, deltaTime) {
-        // Draw shadow slightly below feet
-        gl.disable(gl.DEPTH_TEST);
-        drawShadow(gl, projectionMatrix, programInfo, this.pos[0], this.pos[1] - 1.02, this.pos[2], 0.35, 0.22);
-        gl.enable(gl.DEPTH_TEST);
-
+    drawCube(gl, projectionMatrix, programInfo, deltaTime, alpha = 1) {
         const modelViewMatrix = mat4.create();
         mat4.translate(
             modelViewMatrix,
@@ -319,6 +314,12 @@ let Player = class {
         gl.activeTexture(gl.TEXTURE0);
         gl.bindTexture(gl.TEXTURE_2D, player_texture);
         gl.uniform1i(programInfo.uniformLocations.uSampler, 0);
+        gl.uniform1f(programInfo.uniformLocations.uAlpha, alpha);
+        if (alpha < 1) {
+            gl.enable(gl.BLEND);
+            gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+            gl.depthMask(false);
+        }
 
         // ========== DRAW BODY ==========
         {
@@ -469,6 +470,8 @@ let Player = class {
             gl.drawElements(gl.TRIANGLES, vertexCount, type, offset);
         }
 
-        cubeRotation += deltaTime;
+        gl.uniform1f(programInfo.uniformLocations.uAlpha, 1);
+        gl.depthMask(true);
+        gl.disable(gl.BLEND);
     }
 };
