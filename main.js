@@ -122,7 +122,7 @@ function nextSpawnZ(key, spacing, minAhead) {
 }
 var dying = false;
 var deathTimer = 0;
-var freezeFrame = 0;
+var freezeTime = 0;
 var timeDilation = 1.0;
 
 var gameGl = null;
@@ -547,7 +547,7 @@ function resetGame() {
   police.pos = [-6, -4, 0]; police.speedz = SPEED_BASE;
   dog.pos = [-4, -4.5, -2];
   jumping = ducking = wasInAir = dying = false;
-  duckTime = deathTimer = freezeFrame = 0;
+  duckTime = deathTimer = freezeTime = 0;
   cam_x = target_x = camDip = cameraShake = 0;
   cam_y = 12; cam_y_target = 5; cam_z = 26; camFollow = 30;
   target_y = 7;
@@ -1114,8 +1114,8 @@ async function main() {
     }
 
     // Freeze frame on death impact (render but don't update)
-    if (freezeFrame > 0) {
-      freezeFrame--;
+    if (freezeTime > 0) {
+      freezeTime = Math.max(0, freezeTime - deltaTime);
       drawScene(gl, activeProgram, 0);
       return;
     }
@@ -1325,7 +1325,7 @@ async function main() {
       }
     }
 
-    updateVerticalMotion(gl, timeScale);
+    updateVerticalMotion(gl, timeScale * timeDilation);
 
     // train movement
     var num_trains = trainF.length;
@@ -1477,7 +1477,7 @@ async function main() {
                 particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
               }
               Die();
-              dying = true; freezeFrame = 3;
+              dying = true; freezeTime = 0.05;
               deathTimer = 0;
               break;
             }
@@ -1521,7 +1521,7 @@ async function main() {
                 particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
               }
               Die();
-              dying = true; freezeFrame = 3;
+              dying = true; freezeTime = 0.05;
               deathTimer = 0;
               break;
             }
@@ -1547,7 +1547,7 @@ async function main() {
                 particles.push(new Particle(gl, [player.pos[0], player.pos[1], player.pos[2]], [vx, vy, vz], 0.8 + Math.random() * 0.4, glow_pink_texture));
               }
               Die();
-              dying = true; freezeFrame = 3;
+              dying = true; freezeTime = 0.05;
               deathTimer = 0;
               break;
             }

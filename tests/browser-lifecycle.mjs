@@ -70,6 +70,27 @@ try {
     assert.equal(await page.evaluate(() => uiCurrentScreen), 'pause', 'key repeat resumed the paused run');
   });
 
+  await test('held-effect-keys', async page => {
+    await start(page);
+    for (const [key, flag] of [['g', 'greyScale'], ['f', 'flashing']]) {
+      await page.keyboard.down(key);
+      await page.keyboard.down(key);
+      await page.keyboard.up(key);
+      assert.equal(await page.evaluate(flag => window[flag], flag), true, `holding ${key} switched the effect off`);
+      await page.keyboard.press(key);
+      assert.equal(await page.evaluate(flag => window[flag], flag), false, `a new ${key} press did not toggle off`);
+    }
+  });
+
+  await test('unsupported-fullscreen', async page => {
+    await page.addInitScript(() => Object.defineProperty(Element.prototype, 'requestFullscreen', {configurable: true, value: undefined}));
+    await page.goto(url);
+    await page.locator('#btn-settings').click();
+    assert.equal(await page.locator('#btn-fullscreen').isVisible(), false, 'an unavailable fullscreen action is visible');
+    assert.equal(await page.getByRole('button', {name: 'Fullscreen'}).count(), 0);
+    if (artifacts) await page.screenshot({path: join(artifacts, 'settings-without-fullscreen.png'), animations: 'disabled'});
+  });
+
   await test('accessible-direction-buttons', async page => {
     await page.setViewportSize({width: 390, height: 844});
     await start(page);

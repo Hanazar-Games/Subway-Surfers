@@ -176,6 +176,7 @@ html, body {
   transition: transform var(--transition-fast), box-shadow var(--transition-fast);
   box-shadow: 0 4px 20px rgba(255,42,109,0.3);
 }
+.btn[hidden] { display: none; }
 .btn::after {
   content: '';
   position: absolute; inset: 0;

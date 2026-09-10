@@ -125,7 +125,7 @@ test('chaser heads use the body transform rather than the last limb transform', 
 test('death freezes input, movement, coins and powers until settlement', async () => {
   const g = await game(); g.clearCourse();
   const s = g.state;
-  s.dying = true; s.deathTimer = 0; s.freezeFrame = 0; s.score = 100;
+  s.dying = true; s.deathTimer = 0; s.freezeTime = 0; s.score = 100;
   s.coins[0].exist = true; s.coins[0].pos = s.player.pos.slice();
   s.boots[0].exist = true; s.boots[0].pos = s.player.pos.slice();
   const position = s.player.pos.slice();
@@ -170,6 +170,49 @@ test('near-miss slow motion preserves the police following distance', async () =
   for (let i = 0; i < 20; i++) g.step();
   const after = g.state.police.pos[2] - g.state.player.pos[2];
   assert.ok(Math.abs(after - before) < 0.01, `gap changed from ${before} to ${after}`);
+});
+
+test('slow motion slows jumping, falling and ducking with forward travel', async () => {
+  for (const fps of [30, 60, 120, 144]) {
+    for (const motion of ['jump', 'fall', 'duck']) {
+      const normal = await game(), slow = await game();
+      for (const g of [normal, slow]) {
+        g.clearCourse();
+        if (motion === 'fall') {
+          g.state.player.pos[1] = 5;
+          g.state.player.grounded = false;
+          g.state.player.speedy = -0.2;
+          g.state.wasInAir = true;
+        } else g.key(motion === 'jump' ? 38 : 40);
+      }
+      slow.state.timeDilation = 0.3;
+      for (let i = 0; i < Math.ceil(fps / 10); i++) { normal.step(1 / fps); slow.step(1 / fps); }
+      assert.ok(slow.state.runDistance < normal.state.runDistance * 0.75);
+      if (motion === 'duck') assert.ok(slow.state.duckTime > normal.state.duckTime + 0.03);
+      else {
+        const origin = motion === 'jump' ? -4 : 5;
+        assert.ok(Math.abs(slow.state.player.pos[1] - origin) < Math.abs(normal.state.player.pos[1] - origin) * 0.75,
+          `${motion} ignored slow motion at ${fps}fps`);
+      }
+      for (let i = 0; i < fps * 2; i++) slow.step(1 / fps);
+      assert.equal(slow.state.player.pos[1], -4);
+      assert.equal(slow.state.player.grounded, true);
+      assert.equal(slow.state.ducking, false);
+    }
+  }
+});
+
+test('impact freeze lasts fifty milliseconds within one frame at every refresh rate', async () => {
+  for (const fps of [30, 60, 120, 144]) {
+    const g = await game(); g.clearCourse();
+    g.state.manholes[0].pos = g.state.player.pos.slice();
+    g.step(1 / fps);
+    assert.equal(g.state.dying, true);
+    let frames = 0;
+    while (g.state.deathTimer === 0 && frames < fps) { g.step(1 / fps); frames++; }
+    const hold = (frames - 1) / fps;
+    assert.ok(hold >= 0.05 - 0.00001 && hold <= 0.05 + 1 / fps + 0.00001, `${fps}fps hold: ${hold}s`);
+  }
 });
 
 test('police stay behind the runner through a stumble and recovery', async () => {

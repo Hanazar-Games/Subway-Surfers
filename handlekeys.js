@@ -18,6 +18,7 @@ document.addEventListener(
         }
         if (event.target && event.target.closest && event.target.closest('button, input, select, textarea')) return;
         key = event.keyCode;
+        if (event.repeat && (key === 70 || key === 71)) return;
         // 阻止方向键和空格滚动页面
         if ([32, 37, 38, 39, 40].indexOf(key) !== -1) {
             event.preventDefault();
