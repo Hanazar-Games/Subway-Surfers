@@ -172,6 +172,42 @@ test('near-miss slow motion preserves the police following distance', async () =
   assert.ok(Math.abs(after - before) < 0.01, `gap changed from ${before} to ${after}`);
 });
 
+test('police stay behind the runner through a stumble and recovery', async () => {
+  const g = await game(); g.clearCourse();
+  for (let i = 0; i < 1200; i++) g.step();
+  g.state.placeDuck(0, g.state.player.pos[0], g.state.player.pos[2] - 0.5);
+  g.step();
+  assert.equal(g.state.obstacle_hit_type, 'duck');
+  for (let i = 0; i < 660; i++) {
+    g.step();
+    assert.ok(g.state.police.pos[2] - g.state.player.pos[2] >= 2 - 0.001, 'police overtook the player');
+  }
+  assert.equal(g.state.obstacle_hit, -1);
+  assert.equal(g.state.result, undefined);
+});
+
+test('train rumble warns before impact and fades after the whole train passes', async () => {
+  const g = await game(); g.clearCourse();
+  g.state.player.hoverboard = true; g.state.hoverboard_acquired = 100;
+  const samples = [];
+  g.state.updateTrainRumble = intensity => samples.push(intensity);
+  const measure = distance => {
+    g.state.placeTrain(0, g.state.player.pos[0], g.state.player.pos[2] - distance - 10);
+    g.state.train_speeds[0] = 0;
+    g.step();
+    return samples.at(-1);
+  };
+  assert.equal(measure(30), 0);
+  const approaching = measure(20), close = measure(5), alongside = measure(-10);
+  assert.ok(approaching > 0 && close > approaching && alongside >= close);
+  const departing = measure(-35);
+  assert.ok(departing > 0 && departing < alongside);
+  assert.equal(measure(-50), 0);
+  g.state.placeTrain(0, 6, g.state.player.pos[2] - 10);
+  g.step();
+  assert.equal(samples.at(-1), 0, 'another lane must not trigger a same-lane warning');
+});
+
 test('pause does not create a movement burst on the first resumed frame', async () => {
   const g = await game(); g.clearCourse(); g.step();
   g.state.gamePaused = true; g.step(20);

@@ -73,9 +73,15 @@ window.ssGameStarted = false;
     });
     var target = screens[name];
     if (target) {
-      target.scrollTop = 0;
-      var button = target.querySelector('button');
-      if (button) button.focus({ preventScroll: true });
+      var card = target.querySelector('.glass-card') || target;
+      card.scrollTop = 0;
+      var control = card.querySelector('button, input, select, textarea');
+      if (control && control.getBoundingClientRect().bottom <= card.getBoundingClientRect().bottom) {
+        control.focus({ preventScroll: true });
+      } else {
+        card.tabIndex = -1;
+        card.focus({ preventScroll: true });
+      }
     } else if (document.activeElement instanceof HTMLElement) document.activeElement.blur();
   }
 
@@ -980,6 +986,7 @@ window.ssGameStarted = false;
     function bindTouch(el, code) {
       if (!el) return;
       var handler = function (e) {
+        if (e.button > 0) return;
         e.preventDefault();
         var now = Date.now();
         if (now - (lastTouchEmit[code] || 0) < 90) return;
@@ -992,6 +999,9 @@ window.ssGameStarted = false;
         el.addEventListener('touchstart', handler, { passive: false });
         el.addEventListener('mousedown', handler, { passive: false });
       }
+      el.addEventListener('click', function (e) {
+        if (e.detail === 0) emitKey(code);
+      });
     }
     bindTouch(tLeft,  37);
     bindTouch(tRight, 39);

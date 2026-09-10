@@ -1241,6 +1241,7 @@ async function main() {
     else
       police.speedz = player_speed;
     police.pos[2] -= police.speedz * timeDilation * timeScale;
+    police.pos[2] = Math.max(police.pos[2], player.pos[2] + 2);
     // Police approaching warning (first 5 seconds after obstacle hit)
     if (policeTimer > 0 && policeTimer < 5) {
       var warnIntensity = 1.0 - policeTimer / 5;
@@ -1451,9 +1452,8 @@ async function main() {
     for (var i = 0; i < num_trains; i++) {
       if (player.pos[0] == trainF[i].pos[0]) {
         var zdistRumble = player.pos[2] - trainF[i].pos[2];
-        if (zdistRumble > -25 && zdistRumble < 5) {
-          rumbleIntensity = Math.max(rumbleIntensity, 1.0 - Math.abs(zdistRumble + 5) / 20);
-        }
+        var distanceToTrain = Math.max(0, zdistRumble, -20 - zdistRumble);
+        rumbleIntensity = Math.max(rumbleIntensity, 1 - distanceToTrain / 25);
       }
     }
     if (typeof updateTrainRumble === 'function') updateTrainRumble(rumbleIntensity);

@@ -70,6 +70,84 @@ try {
     assert.equal(await page.evaluate(() => uiCurrentScreen), 'pause', 'key repeat resumed the paused run');
   });
 
+  await test('accessible-direction-buttons', async page => {
+    await page.setViewportSize({width: 390, height: 844});
+    await start(page);
+    await page.locator('#touch-right').click({button: 'right'});
+    assert.equal(await page.evaluate(() => player.pos[0]), -6, 'right mouse button changed lanes');
+    await page.locator('#touch-right').focus();
+    await page.keyboard.press('Space');
+    assert.equal(await page.evaluate(() => player.pos[0]), 0, 'Space did not activate Right');
+    await page.locator('#touch-left').focus();
+    await page.keyboard.press('Enter');
+    assert.equal(await page.evaluate(() => player.pos[0]), -6, 'Enter did not activate Left');
+    await page.locator('#touch-right').click();
+    assert.equal(await page.evaluate(() => player.pos[0]), 0, 'pointer click must move exactly once');
+    await page.keyboard.press('Escape');
+    await page.locator('#touch-right').dispatchEvent('click', {detail: 0});
+    assert.equal(await page.evaluate(() => player.pos[0]), 0, 'hidden controls moved the player');
+  });
+
+  await test('short-screen-scroll-and-focus', async page => {
+    await page.setViewportSize({width: 320, height: 480});
+    await page.goto(url);
+    for (const name of ['stats', 'howto', 'settings']) {
+      for (let visit = 0; visit < 2; visit++) {
+        await page.locator(`#btn-${name}`).click();
+        assert.ok(await page.evaluate(name => {
+          const card = document.querySelector(`#${name}-screen .glass-card`);
+          const bounds = card.getBoundingClientRect(), focus = document.activeElement.getBoundingClientRect();
+          return card.scrollTop === 0 && focus.top >= bounds.top && focus.bottom <= bounds.bottom;
+        }, name), `${name} visit ${visit + 1} must open at the top with visible focus`);
+        if (artifacts && visit === 1) await page.screenshot({path: join(artifacts, `reopened-${name}.png`), animations: 'disabled'});
+        await page.locator(`#btn-${name}-back`).click();
+      }
+    }
+    await page.locator('#btn-settings').click();
+    assert.equal(await page.evaluate(() => document.activeElement.id), 'volume-music', 'settings skipped its first control');
+  });
+
+  await test('sfx-signal-and-stop', async page => {
+    await start(page);
+    const samples = await page.evaluate(async () => {
+      gamePaused = true;
+      uiStopRunAudio();
+      initSfx(); resumeSfx();
+      const analyser = audioCtx.createAnalyser();
+      sfxMasterGain.connect(analyser);
+      const peak = async () => {
+        const data = new Float32Array(analyser.fftSize);
+        let value = 0;
+        for (let i = 0; i < 8; i++) {
+          await new Promise(resolve => setTimeout(resolve, 20));
+          analyser.getFloatTimeDomainData(data);
+          for (const sample of data) value = Math.max(value, Math.abs(sample));
+        }
+        return value;
+      };
+      const results = [];
+      for (const play of [playJumpSound, playBumpSound, playPowerUpSound, playMilestoneFanfare, () => updateTrainRumble(1)]) {
+        setSfxVolume(0.5);
+        play();
+        const audible = await peak();
+        uiStopRunAudio();
+        await new Promise(resolve => setTimeout(resolve, 100));
+        const stopped = await peak();
+        results.push({audible, stopped});
+        await new Promise(resolve => setTimeout(resolve, 900));
+      }
+      sfxMasterGain.disconnect(analyser);
+      return results;
+    });
+    for (const [i, sample] of samples.entries()) {
+      assert.ok(sample.audible > 0.001, `SFX ${i} has no signal`);
+      assert.ok(sample.stopped < 0.00001, `SFX ${i} continues after stopping run audio`);
+    }
+    await page.evaluate(() => uiPauseGame());
+    await page.locator('#btn-resume').click();
+    await page.waitForFunction(() => !document.querySelector('#music').paused && sfxMasterGain.gain.value > 0);
+  });
+
   await test('populated-mobile-hud', async page => {
     await start(page);
     for (const viewport of [{width: 320, height: 568}, {width: 390, height: 844}, {width: 768, height: 1024}, {width: 320, height: 480}]) {
@@ -148,7 +226,7 @@ try {
     await page.waitForFunction(() => document.querySelector('#hud-score').classList.contains('score-pop'));
   });
 
-  for (const stage of ['loading', 'countdown', 'playing', 'pause']) {
+  for (const stage of ['loading', 'countdown', 'countdown-finish', 'playing', 'pause']) {
     await test(`context-loss-${stage}`, async page => {
       let release;
       const held = new Promise(resolve => { release = resolve; });
@@ -158,6 +236,7 @@ try {
         await page.locator('#btn-start').click();
         if (stage === 'loading') await page.waitForFunction(() => typeof gameLoadPromise !== 'undefined');
         else if (stage === 'countdown') await page.waitForFunction(() => document.querySelector('#countdown-overlay').style.display === 'flex');
+        else if (stage === 'countdown-finish') await page.waitForFunction(() => document.querySelector('#countdown-number').textContent === 'GO!');
         else {
           await page.waitForFunction(() => gameReady && !gamePaused);
           if (stage === 'pause') await page.keyboard.press('Escape');
