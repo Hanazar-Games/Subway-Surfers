@@ -3,12 +3,12 @@
 
 <head>
   <meta charset="utf-8">
-  <meta name="application-version" content="1.1.10">
+  <meta name="application-version" content="1.1.11">
   <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
   <title>Subway Surfers</title>
   <link rel="icon" type="image/svg+xml" href="./favicon.svg">
-  <link rel="stylesheet" href="./webgl.css?v=1.1.10" type="text/css">
-  <link rel="stylesheet" href="./ui.css?v=1.1.10" type="text/css">
+  <link rel="stylesheet" href="./webgl.css?v=1.1.11" type="text/css">
+  <link rel="stylesheet" href="./ui.css?v=1.1.11" type="text/css">
 </head>
 
 <body>
@@ -137,13 +137,13 @@
 
       <div class="volume-row">
         <span style="font-size:20px;">🎵</span>
-        <input type="range" id="volume-music" class="volume-slider" min="0" max="100" value="50">
+        <input type="range" id="volume-music" class="volume-slider" aria-label="Music volume" min="0" max="100" value="50">
         <span id="volume-music-value" style="font-size:13px;color:var(--text-secondary);width:36px;text-align:right;">50%</span>
       </div>
 
       <div class="volume-row">
         <span style="font-size:20px;">🔊</span>
-        <input type="range" id="volume-sfx" class="volume-slider" min="0" max="100" value="50">
+        <input type="range" id="volume-sfx" class="volume-slider" aria-label="Sound effects volume" min="0" max="100" value="50">
         <span id="volume-sfx-value" style="font-size:13px;color:var(--text-secondary);width:36px;text-align:right;">50%</span>
       </div>
 
@@ -293,7 +293,7 @@
       </div>
       <div class="volume-row" style="margin-top:20px; justify-content:center;">
         <span style="font-size:16px;">🎵</span>
-        <input type="range" id="pause-volume" class="volume-slider" min="0" max="100" style="width:120px;">
+        <input type="range" id="pause-volume" class="volume-slider" aria-label="Music volume" min="0" max="100" style="width:120px;">
       </div>
     </div>
   </div>
@@ -380,7 +380,7 @@
   <audio src='./assets/Theme.mp3' id="music" loop></audio>
   <audio src='./assets/Crash.mp3' id="crash"></audio>
 
-  <script src="./ui.js?v=1.1.10"></script>
+  <script src="./ui.js?v=1.1.11"></script>
 
   <!-- ===== Splash Screen JS ===== -->
   <script>
@@ -452,27 +452,27 @@
   </script>
 
   <!-- ===== Game Engine Scripts (main.js prefetched for instant start) ===== -->
-  <link rel="prefetch" as="script" href="./main.js?v=1.1.10">
-  <script src="./gl-matrix.js?v=1.1.10"></script>
-  <script src="./shadow_helper.js?v=1.1.10"></script>
-  <script src="./cube.js?v=1.1.10"></script>
-  <script src="./track.js?v=1.1.10"></script>
-  <script src="./wall.js?v=1.1.10"></script>
-  <script src="./city.js?v=1.1.10"></script>
-  <script src="./handlekeys.js?v=1.1.10"></script>
-  <script src="./player.js?v=1.1.10"></script>
-  <script src="./police.js?v=1.1.10"></script>
-  <script src="./dog.js?v=1.1.10"></script>
-  <script src="./coin.js?v=1.1.10"></script>
-  <script src="./particle.js?v=1.1.10"></script>
-  <script src="./train.js?v=1.1.10"></script>
-  <script src="./box.js?v=1.1.10"></script>
-  <script src="./manhole.js?v=1.1.10"></script>
-  <script src="./stop.js?v=1.1.10"></script>
-  <script src="./stand.js?v=1.1.10"></script>
-  <script src="./boots.js?v=1.1.10"></script>
-  <script src="./flying_boost.js?v=1.1.10"></script>
-  <script src="./hoverboard.js?v=1.1.10"></script>
+  <link rel="prefetch" as="script" href="./main.js?v=1.1.11">
+  <script src="./gl-matrix.js?v=1.1.11"></script>
+  <script src="./shadow_helper.js?v=1.1.11"></script>
+  <script src="./cube.js?v=1.1.11"></script>
+  <script src="./track.js?v=1.1.11"></script>
+  <script src="./wall.js?v=1.1.11"></script>
+  <script src="./city.js?v=1.1.11"></script>
+  <script src="./handlekeys.js?v=1.1.11"></script>
+  <script src="./player.js?v=1.1.11"></script>
+  <script src="./police.js?v=1.1.11"></script>
+  <script src="./dog.js?v=1.1.11"></script>
+  <script src="./coin.js?v=1.1.11"></script>
+  <script src="./particle.js?v=1.1.11"></script>
+  <script src="./train.js?v=1.1.11"></script>
+  <script src="./box.js?v=1.1.11"></script>
+  <script src="./manhole.js?v=1.1.11"></script>
+  <script src="./stop.js?v=1.1.11"></script>
+  <script src="./stand.js?v=1.1.11"></script>
+  <script src="./boots.js?v=1.1.11"></script>
+  <script src="./flying_boost.js?v=1.1.11"></script>
+  <script src="./hoverboard.js?v=1.1.11"></script>
 </body>
 
 </html>

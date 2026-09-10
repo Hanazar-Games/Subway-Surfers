@@ -268,15 +268,15 @@ var trainRumbleOsc = null;
 var trainRumbleGain = null;
 
 function updateTrainRumble(intensity) {
-    initSfx();
-    resumeSfx();
-    if (!audioCtx) return;
     if (intensity <= 0) {
         if (trainRumbleGain) {
             try { trainRumbleGain.gain.setTargetAtTime(0, audioCtx.currentTime, 0.1); } catch(e) {}
         }
         return;
     }
+    initSfx();
+    resumeSfx();
+    if (!audioCtx) return;
     if (!trainRumbleOsc) {
         trainRumbleOsc = audioCtx.createOscillator();
         trainRumbleGain = audioCtx.createGain();
@@ -1082,6 +1082,7 @@ async function main() {
   }
 
   await Promise.all(textureLoads);
+  if (gl.isContextLost()) throw new Error('Graphics context lost during loading');
   gameProgramInfo = programInfo;
   gameReady = true;
   var then = performance.now() * 0.001;
@@ -1239,7 +1240,7 @@ async function main() {
       police.speedz = player_speed / 2;
     else
       police.speedz = player_speed;
-    police.pos[2] -= police.speedz * timeScale;
+    police.pos[2] -= police.speedz * timeDilation * timeScale;
     // Police approaching warning (first 5 seconds after obstacle hit)
     if (policeTimer > 0 && policeTimer < 5) {
       var warnIntensity = 1.0 - policeTimer / 5;
@@ -1355,11 +1356,11 @@ async function main() {
         var dz = player.pos[2] - coins[i].pos[2];
         var distSq = dx*dx + dy*dy + dz*dz;
         if (distSq < 36.0) { // within 6 units
-          var pull = 0.08 * timeScale;
+          var pull = 1 - Math.pow(0.92, timeScale);
           // Coin spins faster when being pulled
           coins[i].speed = 0.3;
           // Coin trail when being pulled
-          if (Math.random() < 0.25) {
+          if (Math.random() < 0.25 * timeScale) {
             particles.push(new Particle(gl,
               [coins[i].pos[0], coins[i].pos[1], coins[i].pos[2]],
               [(Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5, (Math.random()-0.5)*0.5],
@@ -1371,7 +1372,7 @@ async function main() {
         }
         if (coins[i].pos[0] == player.pos[0]) {
           if (coins[i].pos[1] >= player.pos[1] - 0.75 && coins[i].pos[1] <= player.pos[1] + 0.75) {
-            if (coins[i].pos[2] >= player.pos[2] - 0.5 && coins[i].pos[2] <= player.pos[2] + 0.5) {
+            if (coins[i].pos[2] >= player.pos[2] - 0.5 && coins[i].pos[2] <= prevPlayerZ + 0.5) {
               coins[i].exist = false;
               var now = Date.now() * 0.001;
               var prevMult = scoreMultiplier;

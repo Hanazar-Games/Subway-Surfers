@@ -31,6 +31,7 @@ window.ssGameStarted = false;
   var hudInterval = null;
   var countdownTimer = null;
   var countdownFallbackTimer = null;
+  var countdownFinishTimer = null;
   var countdownActive = false;
   var gameLaunching = false;
   var runGeneration = 0;
@@ -39,6 +40,7 @@ window.ssGameStarted = false;
   var themeFlashTimer = null;
   var scorePopTimers = new WeakMap();
   var keyHintTimer = null;
+  var activeSwipe = null;
   window.uiCurrentScreen = currentScreen;
 
   // ===== DOM refs =====
@@ -60,6 +62,7 @@ window.ssGameStarted = false;
 
   // ===== Screen Switcher =====
   function showScreen(name) {
+    activeSwipe = null;
     currentScreen = name;
     window.uiCurrentScreen = name;
     Object.keys(screens).forEach(function (k) {
@@ -112,7 +115,19 @@ window.ssGameStarted = false;
   }
 
   // ===== Countdown =====
+  function cancelCountdown() {
+    countdownActive = false;
+    clearInterval(countdownTimer);
+    clearTimeout(countdownFallbackTimer);
+    clearTimeout(countdownFinishTimer);
+    countdownTimer = countdownFallbackTimer = countdownFinishTimer = null;
+    var overlay = $('#countdown-overlay');
+    if (overlay) overlay.style.display = 'none';
+  }
+
   function runCountdown(cb) {
+    cancelCountdown();
+    var generation = runGeneration;
     var overlay = $('#countdown-overlay');
     var numEl = $('#countdown-number');
     if (!overlay || !numEl) {
@@ -125,17 +140,8 @@ window.ssGameStarted = false;
     numEl.textContent = count;
 
     function finishCountdown() {
-      if (!countdownActive) return;
-      countdownActive = false;
-      if (countdownTimer) {
-        clearInterval(countdownTimer);
-        countdownTimer = null;
-      }
-      if (countdownFallbackTimer) {
-        clearTimeout(countdownFallbackTimer);
-        countdownFallbackTimer = null;
-      }
-      overlay.style.display = 'none';
+      if (!countdownActive || generation !== runGeneration) return;
+      cancelCountdown();
       if (cb) cb();
     }
 
@@ -155,14 +161,12 @@ window.ssGameStarted = false;
         if (typeof flashScreen === 'function') flashScreen('rgba(5,217,232,0.25)', 0.3);
         clearInterval(countdownTimer);
         countdownTimer = null;
-        setTimeout(function () {
+        countdownFinishTimer = setTimeout(function () {
           finishCountdown();
         }, 600);
       }
     };
 
-    if (countdownTimer) clearInterval(countdownTimer);
-    if (countdownFallbackTimer) clearTimeout(countdownFallbackTimer);
     countdownTimer = setInterval(tick, 800);
     countdownFallbackTimer = setTimeout(finishCountdown, 3600);
   }
@@ -396,7 +400,7 @@ window.ssGameStarted = false;
   // ===== HUD updater =====
   function startHUDUpdate() {
     stopHUDUpdate();
-    var lastScore = -1, lastCoins = -1, lastTheme = -1, lastMult = -1;
+    var lastScore = -1, lastCoins = -1, lastTheme = -1, lastMult = -1, lastReward = -1;
     var scoreEl = $('#hud-score');
     var coinEl = $('#hud-coins');
     var timeEl = $('#hud-time');
@@ -413,17 +417,18 @@ window.ssGameStarted = false;
     var fHover = $('#fill-hover');
     updateHighScoreDisplay();
 
-    hudInterval = setInterval(function () {
+    function updateHUD() {
+      if (typeof dying !== 'undefined' && dying) return;
       var now = Date.now() * 0.001;
+      var reward = coins_collected + bonusScore;
+      var collectedReward = lastReward >= 0 && reward > lastReward;
+      lastReward = reward;
       // Score
       if (typeof score !== 'undefined' && score !== lastScore) {
-        var diff = Math.floor(score) - Math.floor(lastScore);
         lastScore = score;
         if (scoreEl) {
           scoreEl.textContent = formatNum(Math.floor(score));
-          // Score ticks up continuously with distance; only pop on
-          // meaningful jumps (coin bursts) to avoid constant jitter
-          if (diff >= 5) popScore(scoreEl);
+          if (collectedReward) popScore(scoreEl);
           // Near-record / new-record pulse (skip on first-ever run:
           // everything is a "record" when best is 0)
           var best = getHighScore();
@@ -447,10 +452,11 @@ window.ssGameStarted = false;
       }
       // Coins
       if (typeof coins_collected !== 'undefined' && coins_collected !== lastCoins) {
+        var collectedCoin = lastCoins >= 0 && coins_collected > lastCoins;
         lastCoins = coins_collected;
         if (coinEl) {
           coinEl.textContent = formatNum(coins_collected);
-          popScore(coinEl);
+          if (collectedCoin) popScore(coinEl);
         }
       }
       // Time
@@ -462,10 +468,11 @@ window.ssGameStarted = false;
       }
       // Multiplier
       if (typeof scoreMultiplier !== 'undefined' && scoreMultiplier !== lastMult) {
+        var raisedMultiplier = lastMult >= 0 && scoreMultiplier > lastMult;
         lastMult = scoreMultiplier;
         if (multEl) multEl.textContent = 'x' + scoreMultiplier;
         if (multPanel) multPanel.style.display = scoreMultiplier > 1 ? 'flex' : 'none';
-        if (scoreMultiplier > 1 && multEl) popScore(multEl);
+        if (raisedMultiplier && multEl) popScore(multEl);
       }
       // Theme
       if (typeof theme !== 'undefined' && theme !== lastTheme) {
@@ -501,7 +508,9 @@ window.ssGameStarted = false;
           if (pHover) pHover.classList.toggle('warning', rem < 3);
         } else if (fHover) { fHover.style.transform = 'scaleX(0)'; if (pHover) pHover.classList.remove('warning'); }
       }
-    }, 80);
+    }
+    updateHUD();
+    hudInterval = setInterval(updateHUD, 80);
   }
   function stopHUDUpdate() {
     if (hudInterval) { clearInterval(hudInterval); hudInterval = null; }
@@ -561,9 +570,25 @@ window.ssGameStarted = false;
   }
 
   // ===== Public: Start Game =====
+  function showGameError(message) {
+    runGeneration++;
+    gameLaunching = false;
+    if (typeof gameReady !== 'undefined') gameReady = false;
+    setPaused(true);
+    cancelCountdown();
+    stopHUDUpdate();
+    hideHUD();
+    uiStopRunAudio();
+    if (crashAudio) crashAudio.pause();
+    $('#loading-overlay').classList.add('hidden');
+    $('#screen-flash').style.opacity = '0';
+    if (message) $('#webgl-error-message').textContent = message;
+    showScreen('webgl-error');
+  }
+
   window.uiStartGame = function () {
     if (gameLaunching || currentScreen !== 'start') return;
-    runGeneration++;
+    var generation = ++runGeneration;
     pauseStartedAt = 0;
     $('#screen-flash').style.opacity = '0';
     if (typeof endSplash === 'function') endSplash(true);
@@ -579,8 +604,7 @@ window.ssGameStarted = false;
     var canvas = document.getElementById('glcanvas');
     var gl = canvas.getContext('webgl') || canvas.getContext('experimental-webgl');
     if (!gl) {
-      gameLaunching = false;
-      showScreen('webgl-error');
+      showGameError();
       return;
     }
 
@@ -594,11 +618,11 @@ window.ssGameStarted = false;
       showScreen('playing');
       setPaused(true);
       runCountdown(function () {
-        showHUD();
-        startHUDUpdate();
-        showKeyHint();
         if (typeof resetGameStartTiming === 'function') resetGameStartTiming();
         setPaused(false);
+        startHUDUpdate();
+        showHUD();
+        showKeyHint();
         applyAudio();
         if (typeof resumeSfx === 'function') resumeSfx();
         var s = getAudioSettings();
@@ -620,18 +644,14 @@ window.ssGameStarted = false;
       });
     }
     scriptReady.then(function () { return gameLoadPromise; }).then(function () {
+      if (generation !== runGeneration) return;
       if (!gameReady) throw new Error('Game initialization failed');
       if (hasRun) resetGame();
       hasRun = true;
       startPlay();
     }).catch(function (error) {
-      gameLaunching = false;
-      setPaused(true);
-      uiStopRunAudio();
-      if (loading) loading.classList.add('hidden');
-      var message = $('#webgl-error-message');
-      if (message) message.textContent = 'The game could not load. Check your connection and reload to try again.';
-      showScreen('webgl-error');
+      if (generation !== runGeneration) return;
+      showGameError('The game could not load. Check your connection and reload to try again.');
       console.error(error);
     });
   };
@@ -706,6 +726,8 @@ window.ssGameStarted = false;
   // ===== Public: Go to Menu =====
   window.uiGoMenu = function () {
     runGeneration++;
+    gameLaunching = false;
+    cancelCountdown();
     setPaused(true);
     stopHUDUpdate();
     hideHUD();
@@ -737,15 +759,7 @@ window.ssGameStarted = false;
     if (currentScreen === 'gameover') return; // guard against double-fire (stats would double-count)
     setPaused(true);
     gameLaunching = false;
-    countdownActive = false;
-    if (countdownTimer) {
-      clearInterval(countdownTimer);
-      countdownTimer = null;
-    }
-    if (countdownFallbackTimer) {
-      clearTimeout(countdownFallbackTimer);
-      countdownFallbackTimer = null;
-    }
+    cancelCountdown();
     stopHUDUpdate();
     hideHUD();
     fadeAudio(0, 1000, function() { if (gameAudio) gameAudio.pause(); });
@@ -985,22 +999,23 @@ window.ssGameStarted = false;
     bindTouch(tDuck,  40);
 
     // Swipe gesture support (anywhere on screen during gameplay)
-    var touchStartX = 0, touchStartY = 0;
-    var swipeFromControls = false;
     var minSwipe = 40;
     document.addEventListener('touchstart', function(e) {
-      if (currentScreen !== 'playing') return;
-      // Touches starting on the on-screen buttons already emit a key on
-      // pointerdown — don't let the same gesture fire a swipe too
-      var t = e.target;
-      swipeFromControls = !!(t && t.closest && t.closest('#touch-controls'));
-      touchStartX = e.touches[0].clientX;
-      touchStartY = e.touches[0].clientY;
+      activeSwipe = null;
+      if (currentScreen !== 'playing' || gamePaused || countdownActive || e.touches.length !== 1) return;
+      if (e.target.closest && e.target.closest('#touch-controls, button, input, select, textarea')) return;
+      var touch = e.touches[0];
+      activeSwipe = { id: touch.identifier, x: touch.clientX, y: touch.clientY };
     }, { passive: true });
+    document.addEventListener('touchcancel', function () { activeSwipe = null; }, { passive: true });
     document.addEventListener('touchend', function(e) {
-      if (currentScreen !== 'playing' || swipeFromControls) return;
-      var dx = e.changedTouches[0].clientX - touchStartX;
-      var dy = e.changedTouches[0].clientY - touchStartY;
+      var swipe = activeSwipe;
+      activeSwipe = null;
+      if (!swipe || currentScreen !== 'playing' || gamePaused || e.touches.length) return;
+      var touch = Array.from(e.changedTouches).find(function (item) { return item.identifier === swipe.id; });
+      if (!touch) return;
+      var dx = touch.clientX - swipe.x;
+      var dy = touch.clientY - swipe.y;
       if (Math.abs(dx) > Math.abs(dy) && Math.abs(dx) > minSwipe) {
         emitKey(dx > 0 ? 39 : 37);
       } else if (Math.abs(dy) > Math.abs(dx) && Math.abs(dy) > minSwipe) {
@@ -1011,6 +1026,7 @@ window.ssGameStarted = false;
     // ESC to pause/resume (or back out of menu subscreens),
     // Enter/Space to restart from gameover
     document.addEventListener('keydown', function (e) {
+      if (e.repeat) return;
       if (e.key === 'Escape') {
         if (currentScreen === 'playing') uiPauseGame();
         else if (currentScreen === 'pause') uiResumeGame();
@@ -1033,6 +1049,10 @@ window.ssGameStarted = false;
       if (currentScreen === 'playing' && !countdownActive) uiPauseGame();
       uiStopRunAudio();
       if (crashAudio) crashAudio.pause();
+    });
+
+    $('#glcanvas').addEventListener('webglcontextlost', function () {
+      showGameError('Graphics were interrupted. Reload the game to play again.');
     });
 
     // Background particles

@@ -92,7 +92,7 @@ test('effect PNGs contain complete, valid scanlines', () => {
 test('boosted jumps rise above a normal jump and land at every supported frame rate', async () => {
   for (const fps of [30, 60, 120, 144]) {
     const g = await game(); g.clearCourse();
-    g.state.player.jumping_boots = true; g.state.boots_acquired = 100; g.state.jump_height = 3;
+    g.state.player.jumping_boots = true; g.state.boots_acquired = 100;
     g.key(38);
     let peak = -4, lowest = -4;
     for (let i = 0; i < fps * 2; i++) { g.step(1 / fps); peak = Math.max(peak, g.state.player.pos[1]); lowest = Math.min(lowest, g.state.player.pos[1]); }
@@ -150,6 +150,26 @@ test('coin count stays physical while streak bonuses contribute to score', async
   }
   assert.equal(g.state.coins_collected, 20);
   assert.ok(Math.abs(g.state.score - g.state.runDistance - 32) < 0.001);
+});
+
+test('fast movement collects coins crossed between frames', async () => {
+  for (const fps of [30, 60, 120, 144]) {
+    const g = await game(); g.clearCourse();
+    g.state.SPEED_BASE = 1.05;
+    g.state.coins[0].exist = true;
+    g.state.coins[0].pos = [g.state.player.pos[0], -4, g.state.player.pos[2] - 0.1];
+    g.step(1 / fps);
+    assert.equal(g.state.coins_collected, 1, `${fps}fps skipped a crossed coin`);
+  }
+});
+
+test('near-miss slow motion preserves the police following distance', async () => {
+  const g = await game(); g.clearCourse();
+  const before = g.state.police.pos[2] - g.state.player.pos[2];
+  g.state.timeDilation = 0.3;
+  for (let i = 0; i < 20; i++) g.step();
+  const after = g.state.police.pos[2] - g.state.player.pos[2];
+  assert.ok(Math.abs(after - before) < 0.01, `gap changed from ${before} to ${after}`);
 });
 
 test('pause does not create a movement burst on the first resumed frame', async () => {
