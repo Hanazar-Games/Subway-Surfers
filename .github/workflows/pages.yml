@@ -2,7 +2,7 @@ name: Deploy to GitHub Pages
 
 on:
   push:
-    branches: [main, master]
+    branches: [master]
   workflow_dispatch:
 
 permissions:
@@ -16,6 +16,8 @@ concurrency:
 
 jobs:
   deploy:
+    if: github.ref == 'refs/heads/master'
+    timeout-minutes: 15
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -28,9 +30,35 @@ jobs:
         uses: actions/setup-node@v4
         with:
           node-version: 22
+          cache: npm
+
+      - name: Install test dependencies
+        run: npm ci
 
       - name: Run regression tests
-        run: node --test tests/regressions.test.cjs
+        run: npm test
+
+      - name: Build Pages artifact
+        run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Test Pages artifact under the project path
+        env:
+          GAME_URL: http://127.0.0.1:8735/Subway-Surfers/
+        run: |
+          mkdir -p "$RUNNER_TEMP/pages-preview"
+          ln -s "$GITHUB_WORKSPACE/_site" "$RUNNER_TEMP/pages-preview/Subway-Surfers"
+          python3 -m http.server 8735 --bind 127.0.0.1 --directory "$RUNNER_TEMP/pages-preview" > "$RUNNER_TEMP/pages-server.log" 2>&1 &
+          server_pid=$!
+          trap 'kill "$server_pid"' EXIT
+          for attempt in {1..30}; do
+            if curl --fail --silent "$GAME_URL" > /dev/null; then break; fi
+            sleep 1
+          done
+          curl --fail --silent "$GAME_URL" > /dev/null
+          npm run test:browser
 
       - name: Setup Pages
         uses: actions/configure-pages@v5
@@ -38,7 +66,7 @@ jobs:
       - name: Upload artifact
         uses: actions/upload-pages-artifact@v3
         with:
-          path: .
+          path: _site
 
       - name: Deploy to GitHub Pages
         id: deployment

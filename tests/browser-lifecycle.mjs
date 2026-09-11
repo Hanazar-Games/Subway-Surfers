@@ -1,11 +1,8 @@
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { browserClient } from './browser-client.mjs';
 
-const skillDir = process.argv[2];
-if (!skillDir) throw new Error('Usage: node tests/browser-lifecycle.mjs /path/to/dev-browser [artifact-directory]');
-const { connect } = await import(pathToFileURL(join(skillDir, 'dist/src/client.js')));
-const client = await connect();
+const client = await browserClient();
 const prefix = `subway-lifecycle-${Date.now()}`;
 const url = process.env.GAME_URL || 'http://127.0.0.1:8735';
 const artifacts = process.argv[3];
@@ -40,6 +37,29 @@ async function start(page) {
 }
 
 try {
+  await test('pages-resources-and-reload', async page => {
+    await page.unroute('**/*');
+    const responses = [];
+    page.on('response', response => responses.push(response));
+    for (let load = 0; load < 2; load++) {
+      await start(page);
+      await page.waitForFunction(() => ['music', 'crash'].every(id => document.getElementById(id).readyState >= 2));
+      assert.equal(await page.locator('#music').evaluate(el => el.paused), false);
+      const base = new URL('./', page.url());
+      const version = await page.locator('meta[name="application-version"]').getAttribute('content');
+      const resources = responses.filter(response => /\.(js|css|png|jpe?g|mp3)(\?|$)/.test(response.url()));
+      assert.ok(resources.some(response => new URL(response.url()).pathname.endsWith('/main.js')));
+      for (const response of resources) {
+        const resource = new URL(response.url());
+        assert.ok(response.ok(), `${response.status()} ${resource}`);
+        assert.ok(resource.href.startsWith(base.href), `resource escaped the Pages project path: ${resource}`);
+        assert.equal(resource.searchParams.get('v'), version, `mixed resource version: ${resource}`);
+        assert.ok(!response.headers()['content-type']?.includes('text/html'), `HTML served as a runtime resource: ${resource}`);
+      }
+      responses.length = 0;
+    }
+  });
+
   await test('multi-touch', async page => {
     await start(page);
     const result = await page.evaluate(() => {

@@ -1,14 +1,11 @@
 import assert from 'node:assert/strict';
-import { pathToFileURL } from 'node:url';
 import { join } from 'node:path';
+import { browserClient } from './browser-client.mjs';
 
-const skillDir = process.argv[2];
-if (!skillDir) throw new Error('Usage: node tests/browser.mjs /path/to/dev-browser [artifact-directory]');
-const { connect } = await import(pathToFileURL(join(skillDir, 'dist/src/client.js')));
-const client = await connect();
+const client = await browserClient();
 const url = process.env.GAME_URL || 'http://127.0.0.1:8735';
 const prefix = `subway-regression-${Date.now()}`;
-const pages = [], errors = [], renderingErrors = [];
+const pages = [], errors = [], renderingErrors = [], mediaPages = [];
 const artifactDir = process.argv[3];
 const check = (condition, message) => { assert.ok(condition, message); console.log(`PASS ${message}`); };
 
@@ -18,10 +15,16 @@ async function newPage(name, setup, expectedFailure = false) {
   const page = await client.page(pageName, { viewport: { width: 1440, height: 1000 } });
   page.on('pageerror', error => errors.push(error.message));
   if (!expectedFailure) {
+    mediaPages.push(page);
     page.on('console', message => {
       if (message.type() === 'error' || /GL_INVALID|GL_OUT_OF_MEMORY|INVALID_OPERATION/.test(message.text())) renderingErrors.push(message.text());
     });
-    page.on('requestfailed', request => renderingErrors.push(`${request.url()}: ${request.failure()?.errorText}`));
+    page.on('requestfailed', request => {
+      const error = request.failure()?.errorText;
+      // Navigation, seeking, or media preload can cancel the remaining transfer.
+      if (request.resourceType() === 'media' && error === 'net::ERR_ABORTED') return;
+      renderingErrors.push(`${name}: ${request.url()}: ${error}`);
+    });
     page.on('response', response => { if (response.status() >= 400) renderingErrors.push(`${response.status()} ${response.url()}`); });
   }
   await page.route('**/*', route => route.continue());
@@ -287,6 +290,9 @@ try {
   await shaderFailure.waitForFunction(() => uiCurrentScreen === 'webgl-error');
   check(await shaderFailure.evaluate(() => gamePaused && !gameReady), 'shader failure cannot start a broken run');
 
+  for (const page of mediaPages) {
+    check(await page.locator('audio').evaluateAll(elements => elements.every(el => !el.error)), 'audio elements report no loading or decoding errors');
+  }
   check(errors.length === 0, `no uncaught browser errors: ${errors.join('; ')}`);
   check(renderingErrors.length === 0, `no unexpected console, WebGL or network errors: ${renderingErrors.join('; ')}`);
 } finally {
